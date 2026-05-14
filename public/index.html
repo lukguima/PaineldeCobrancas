@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel de Monitoramento — Cobranças</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div id="toast" class="toast"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="url(#logoGrad)"/>
+          <path d="M8 20L14 12L19 17L24 10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="24" cy="10" r="2" fill="#00d4ff"/>
+          <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#00d4ff"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div>
+        <h1 class="header-title">Painel de Cobranças</h1>
+        <p class="header-sub">Monitoramento Financeiro em Tempo Real</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-date" id="headerDate"></div>
+      <button class="btn btn-ghost btn-sm" onclick="openAiModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 3.18-1.65 5.97-4.13 7.57L17 22H7l.13-3.43A9 9 0 0 1 12 2z"/><circle cx="12" cy="11" r="1"/></svg>
+        Análise IA
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="openUploadModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar Arquivo
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- KPI Row: 5 cards -->
+    <section class="kpi-grid">
+
+      <div class="kpi-card kpi-purple">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-label">Clientes Cadastrados</span>
+          <span class="kpi-value" id="val-clientes">—</span>
+          <span class="kpi-sub">empresas únicas</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-cyan">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-label">Boletos no Mês</span>
+          <span class="kpi-value" id="val-mes">—</span>
+          <span class="kpi-sub" id="sub-mes">boletos emitidos</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-label">Total a Receber</span>
+          <span class="kpi-value" id="val-areceber">R$ —</span>
+          <span class="kpi-sub" id="cnt-areceber">— pendentes</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-green">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-label">Total Recebido</span>
+          <span class="kpi-value" id="val-recebido">R$ —</span>
+          <span class="kpi-sub" id="cnt-recebido">— liquidados</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-red">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-label">Inadimplência</span>
+          <span class="kpi-value" id="val-vencido">R$ —</span>
+          <span class="kpi-sub" id="cnt-vencido">— não recebidos</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Transactions + Alerts side-by-side -->
+    <div class="table-alerts-layout">
+
+      <!-- Transactions Table: slightly reduced -->
+      <section class="chart-card table-section">
+        <div class="chart-header">
+          <h3 class="chart-title">Transações</h3>
+          <div class="table-controls">
+            <input type="text" id="searchInput" class="search-input" placeholder="Buscar empresa…" oninput="filterPayments()" />
+            <select id="filterOcorrencia" class="filter-select" onchange="filterPayments()">
+              <option value="">Todos os status</option>
+              <option value="06 - Liquidação sem Float">Liquidado</option>
+              <option value="09 - Baixa">Baixa</option>
+              <option value="02 - Entrada confirmada">A Receber</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Ocorrência</th>
+                <th>Vencimento</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsBody">
+              <tr><td colspan="6" class="empty-state">Carregando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-pagination" id="pagination"></div>
+      </section>
+
+      <!-- Alerts Sidebar -->
+      <aside class="alerts-sidebar" id="alertsSidebar">
+        <div class="alerts-sidebar-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Alertas do Dia
+        </div>
+        <div id="alertsContainer">
+          <div class="alert-loading">
+            <div class="ai-spinner" style="width:20px;height:20px;border-width:2px"></div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- Charts + Uploads Row -->
+    <section class="charts-row">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Distribuição por Status</h3>
+          <span class="chart-period" id="chart1-period">Todos os registros</span>
+        </div>
+        <div class="chart-body">
+          <canvas id="chartOcorrencia"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Histórico de Importações</h3>
+          <button class="btn btn-ghost btn-xs" onclick="openUploadModal()">+ Novo</button>
+        </div>
+        <div id="uploadsHistory" class="uploads-list">
+          <p class="empty-state">Nenhuma importação ainda</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Company Drawer -->
+  <div id="companyDrawerOverlay" class="drawer-overlay" onclick="closeDrawer(event)"></div>
+  <aside id="companyDrawer" class="company-drawer">
+    <div class="drawer-header">
+      <div class="drawer-company-info">
+        <div class="drawer-company-icon" id="drawerIcon">A</div>
+        <div>
+          <h2 class="drawer-company-name" id="drawerName">—</h2>
+          <span class="drawer-company-cnpj" id="drawerCnpj">—</span>
+        </div>
+      </div>
+      <button class="drawer-close" onclick="closeDrawerDirect()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="drawer-kpis">
+      <div class="drawer-kpi dk-green">
+        <span class="dk-label">Recebido</span>
+        <span class="dk-value" id="dk-recebido">—</span>
+      </div>
+      <div class="drawer-kpi dk-red">
+        <span class="dk-label">Baixas</span>
+        <span class="dk-value" id="dk-baixa">—</span>
+      </div>
+      <div class="drawer-kpi dk-amber">
+        <span class="dk-label">A Receber</span>
+        <span class="dk-value" id="dk-areceber">—</span>
+      </div>
+      <div class="drawer-kpi dk-cyan">
+        <span class="dk-label">Boletos</span>
+        <span class="dk-value" id="dk-boletos">—</span>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4 class="drawer-section-title">Histórico Anual</h4>
+      <div class="drawer-chart-wrap">
+        <canvas id="chartCompany"></canvas>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4 class="drawer-section-title">Registros</h4>
+      <div id="drawerPayments" class="drawer-payments-list"></div>
+    </div>
+
+    <div id="drawerLoading" class="drawer-loading">
+      <div class="ai-spinner"></div>
+      <p>Carregando histórico…</p>
+    </div>
+  </aside>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="modal-overlay" onclick="closeUploadModal(event)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Importar Arquivo Bancário</h2>
+        <button class="modal-close" onclick="closeUploadModalDirect()">×</button>
+      </div>
+      <div id="dropZone" class="drop-zone"
+        ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+        onclick="document.getElementById('fileInput').click()">
+        <div class="drop-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <p class="drop-text">Arraste o arquivo Excel aqui</p>
+        <p class="drop-sub">ou clique para selecionar (.xlsx, .xls)</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden onchange="handleFileSelect(event)" />
+      </div>
+      <div id="uploadProgress" class="upload-progress hidden">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <p class="progress-text" id="progressText">Processando…</p>
+      </div>
+      <div id="uploadResult" class="upload-result hidden"></div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal-overlay" onclick="closeEditModal(event)">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <h2 class="modal-title">Editar Registro</h2>
+        <button class="modal-close" onclick="closeEditModalDirect()">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editId" />
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Empresa / Pagador</label>
+            <input type="text" id="editPagador" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor do Boleto (R$)</label>
+            <input type="number" id="editValor" class="form-input" step="0.01" min="0" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="editOcorrencia" class="form-input form-select">
+              <option value="06 - Liquidação sem Float">Liquidado</option>
+              <option value="09 - Baixa">Baixa</option>
+              <option value="02 - Entrada confirmada">A Receber</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Ocorrência</label>
+            <input type="text" id="editDataOcorrencia" class="form-input" placeholder="dd/mm/aaaa" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Vencimento</label>
+            <input type="text" id="editDataVencimento" class="form-input" placeholder="dd/mm/aaaa" />
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Observação</label>
+            <input type="text" id="editObservacao" class="form-input" placeholder="Opcional…" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeEditModalDirect()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveEdit()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Salvar Alterações
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="deleteModal" class="modal-overlay" onclick="closeDeleteModal(event)">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">Confirmar Exclusão</h2>
+        <button class="modal-close" onclick="closeDeleteModalDirect()">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-text">Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.</p>
+        <div id="deleteInfo" class="confirm-info"></div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeDeleteModalDirect()">Cancelar</button>
+          <button class="btn btn-danger" onclick="confirmDelete()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Modal -->
+  <div id="aiModal" class="modal-overlay" onclick="closeAiModal(event)">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <div class="ai-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 3.18-1.65 5.97-4.13 7.57L17 22H7l.13-3.43A9 9 0 0 1 12 2z"/></svg>
+          </div>
+          <h2 class="modal-title">Análise com Inteligência Artificial</h2>
+        </div>
+        <button class="modal-close" onclick="closeAiModalDirect()">×</button>
+      </div>
+      <div class="ai-key-row">
+        <input type="password" id="deepseekKey" class="ai-key-input" placeholder="Cole sua chave DeepSeek API aqui…" />
+        <button class="btn btn-primary" onclick="runAiAnalysis()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Analisar
+        </button>
+      </div>
+      <p class="ai-hint">Sua chave é usada apenas nesta sessão e não é armazenada no servidor.</p>
+      <div id="aiResult" class="ai-result hidden"></div>
+      <div id="aiLoading" class="ai-loading hidden">
+        <div class="ai-spinner"></div>
+        <p>Analisando dados com IA…</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
