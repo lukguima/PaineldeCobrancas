@@ -153,10 +153,13 @@ let wppQr = null;
 
 async function initWhatsApp() {
   try {
+    console.log('[WPP] Carregando Baileys...');
     const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = await import('@whiskeysockets/baileys');
+    console.log('[WPP] Baileys carregado. Carregando @hapi/boom...');
     const { Boom } = await import('@hapi/boom');
     const QRCode = require('qrcode');
     const pino = require('pino');
+    console.log('[WPP] Dependências OK.');
 
     if (wppClient) {
       try { wppClient.end(); } catch {}
@@ -168,8 +171,10 @@ async function initWhatsApp() {
 
     const sessionPath = path.join(__dirname, 'data', 'wpp-session');
     if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
+    console.log('[WPP] Carregando sessão em:', sessionPath);
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    console.log('[WPP] Sessão carregada. Criando socket...');
 
     const sock = makeWASocket({
       auth: state,
@@ -180,6 +185,7 @@ async function initWhatsApp() {
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
+      console.log('[WPP] connection.update:', JSON.stringify({ connection, hasQr: !!qr }));
 
       if (qr) {
         wppStatus = 'qr';
@@ -205,8 +211,10 @@ async function initWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 
     wppClient = sock;
+    console.log('[WPP] Socket criado. Aguardando eventos de conexão...');
   } catch (err) {
-    console.error('Erro ao inicializar WhatsApp:', err.message, err.stack);
+    console.error('[WPP] ERRO ao inicializar:', err.message);
+    console.error('[WPP] Stack:', err.stack);
     wppStatus = 'error';
     wppQr = null;
   }
