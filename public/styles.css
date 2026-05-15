@@ -751,3 +751,72 @@ body {
 .kpi-card:nth-child(5) { animation-delay: .20s; }
 .table-section { animation: fadeInUp .45s ease both; animation-delay: .24s; }
 .chart-card { animation: fadeInUp .45s ease both; animation-delay: .30s; }
+
+/* ===== PERIOD FILTER ===== */
+.period-filter {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 8px; height: 34px;
+}
+.filter-date {
+  border: none; background: transparent; outline: none;
+  color: var(--text); font-family: var(--font); font-size: 12px;
+  cursor: pointer; width: 120px;
+}
+.filter-date::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+.period-sep { color: var(--text-muted); font-size: 12px; }
+.btn-clear-period {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+  transition: color .15s; font-family: var(--font);
+}
+.btn-clear-period:hover { color: var(--red); }
+
+/* ===== METHOD BADGES ===== */
+.method-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 600; padding: 2px 6px;
+  border-radius: 4px; margin-top: 3px;
+}
+.method-boleto { background: var(--cyan-dim); color: var(--cyan); }
+.method-pix    { background: var(--purple-dim); color: var(--purple); }
+
+/* ===== COMPANIES MODAL ===== */
+.modal-card-xl { max-width: 860px; }
+.companies-layout { display: grid; grid-template-columns: 1fr 340px; gap: 0; min-height: 420px; }
+.companies-list-col {
+  border-right: 1px solid var(--border); padding: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.companies-list-head { display: flex; align-items: center; justify-content: space-between; }
+.companies-count { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.companies-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 370px; }
+.company-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg);
+  transition: border-color .15s, background .15s;
+}
+.company-card:hover { border-color: var(--border-hover); background: rgba(0,0,0,0.02); }
+.company-card-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--purple-dim), var(--cyan-dim));
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: var(--purple);
+}
+.company-card-info { flex: 1; min-width: 0; }
+.company-card-nome { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.company-card-cnpj { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.company-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.company-action-btn {
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.company-action-btn:hover { background: var(--surface-hover); color: var(--text); }
+.company-action-btn.del:hover { background: var(--red-dim); border-color: rgba(220,38,38,0.3); color: var(--red); }
+
+.company-form-col { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.company-form-title { font-size: 14px; font-weight: 700; color: var(--text); padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.company-form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }

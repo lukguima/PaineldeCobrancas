@@ -3,6 +3,7 @@ let currentPage = 1;
 const PAGE_SIZE = 50;
 let chartOcorrencia, chartCompany;
 let filterSearch = '', filterOcorrencia = '';
+let filterDataInicio = '', filterDataFim = '';
 let pendingDeleteId = null;
 
 /* ===== INIT ===== */
@@ -147,7 +148,11 @@ function updateUploads(uploads) {
 /* ===== TABLE ===== */
 async function loadPayments() {
   try {
-    const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE, search: filterSearch, ocorrencia: filterOcorrencia });
+    const params = new URLSearchParams({
+      page: currentPage, limit: PAGE_SIZE,
+      search: filterSearch, ocorrencia: filterOcorrencia,
+      dataInicio: filterDataInicio, dataFim: filterDataFim
+    });
     const data = await apiFetch(`/api/payments?${params}`);
     renderTable(data.payments);
     renderPagination(data.total, data.pages);
@@ -179,6 +184,7 @@ function renderTable(payments) {
 
     const valor = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     const idSafe = encodeURIComponent(p.id);
+    const metodoBadge = `<div><span class="method-badge ${(p.metodoPagamento || 'boleto') === 'pix' ? 'method-pix' : 'method-boleto'}">${(p.metodoPagamento || 'boleto') === 'pix' ? '⚡ PIX' : '🏦 Boleto'}</span></div>`;
 
     // Show "Dar Baixa" only if not already baixa
     const baixaBtn = !p.ocorrencia.includes('09')
@@ -194,7 +200,7 @@ function renderTable(payments) {
         <div class="empresa-cell clickable" title="${nome}" onclick="openDrawer('${cnpj.replace(/'/g,"\\'")}', '${nomeShort.replace(/'/g,"\\'")}', '${nome.replace(/'/g,"\\'")}' )">${nomeShort}</div>
         <div class="empresa-cnpj">${cnpj}</div>
       </td>
-      <td><span class="status-pill ${pillClass}">${pillLabel}</span></td>
+      <td><span class="status-pill ${pillClass}">${pillLabel}</span>${metodoBadge}</td>
       <td class="valor-cell ${valorClass}">R$ ${valor}</td>
       <td class="date-cell">${p.dataOcorrencia || '—'}</td>
       <td class="date-cell">${p.dataVencimento || '—'}</td>
@@ -246,6 +252,15 @@ function goPage(p) { currentPage = p; loadPayments(); }
 function filterPayments() {
   filterSearch = document.getElementById('searchInput').value;
   filterOcorrencia = document.getElementById('filterOcorrencia').value;
+  filterDataInicio = document.getElementById('filterDataInicio').value;
+  filterDataFim = document.getElementById('filterDataFim').value;
+  currentPage = 1; loadPayments();
+}
+
+function clearPeriod() {
+  document.getElementById('filterDataInicio').value = '';
+  document.getElementById('filterDataFim').value = '';
+  filterDataInicio = ''; filterDataFim = '';
   currentPage = 1; loadPayments();
 }
 
@@ -284,6 +299,7 @@ async function openEditModal(idEncoded) {
     document.getElementById('editDataOcorrencia').value = p.dataOcorrencia;
     document.getElementById('editDataVencimento').value = p.dataVencimento;
     document.getElementById('editObservacao').value = p.observacao || '';
+    document.getElementById('editMetodoPagamento').value = p.metodoPagamento || 'boleto';
     document.getElementById('editModal').classList.add('open');
   } catch (err) {
     showToast(err.message, 'error');
@@ -301,7 +317,8 @@ async function saveEdit() {
     ocorrencia: document.getElementById('editOcorrencia').value,
     dataOcorrencia: document.getElementById('editDataOcorrencia').value,
     dataVencimento: document.getElementById('editDataVencimento').value,
-    observacao: document.getElementById('editObservacao').value
+    observacao: document.getElementById('editObservacao').value,
+    metodoPagamento: document.getElementById('editMetodoPagamento').value,
   };
   try {
     await apiFetch(`/api/payments?id=${encodeURIComponent(id)}`, {
@@ -733,4 +750,120 @@ function scheduleAlertRefresh() {
   const now = new Date();
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 30);
   setTimeout(() => { loadAlerts(); scheduleAlertRefresh(); }, midnight - now);
+}
+
+/* ===== COMPANIES MODAL ===== */
+function openCompaniesModal() {
+  document.getElementById('companiesModal').classList.add('open');
+  loadCompanies();
+}
+function closeCompaniesModal(e) { if (e.target === document.getElementById('companiesModal')) closeCompaniesModalDirect(); }
+function closeCompaniesModalDirect() {
+  document.getElementById('companiesModal').classList.remove('open');
+  closeCompanyForm();
+}
+
+async function loadCompanies() {
+  try {
+    const data = await apiFetch('/api/companies');
+    renderCompanies(data.companies || []);
+  } catch { document.getElementById('companiesList').innerHTML = '<p class="empty-state">Erro ao carregar</p>'; }
+}
+
+function renderCompanies(companies) {
+  const el = document.getElementById('companiesList');
+  document.getElementById('companiesCount').textContent = `${companies.length} empresa${companies.length !== 1 ? 's' : ''}`;
+  if (companies.length === 0) { el.innerHTML = '<p class="empty-state">Nenhuma empresa cadastrada</p>'; return; }
+  el.innerHTML = companies.map(c => {
+    const initial = (c.nome || '?')[0].toUpperCase();
+    const badge = c.metodoPadrao === 'pix'
+      ? `<span class="method-badge method-pix">⚡ PIX</span>`
+      : `<span class="method-badge method-boleto">🏦 Boleto</span>`;
+    return `<div class="company-card">
+      <div class="company-card-icon">${initial}</div>
+      <div class="company-card-info">
+        <div class="company-card-nome">${c.nome}</div>
+        <div class="company-card-cnpj">${c.cnpj} ${badge}</div>
+      </div>
+      <div class="company-card-actions">
+        <button class="company-action-btn" onclick="openCompanyForm('${c.id}')" title="Editar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="company-action-btn del" onclick="deleteCompany('${c.id}', '${c.nome.replace(/'/g,"\\'")}' )" title="Excluir">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let companiesCache = [];
+async function openCompanyForm(id) {
+  const col = document.getElementById('companyFormCol');
+  const title = document.getElementById('companyFormTitle');
+  col.style.display = 'flex';
+  col.style.flexDirection = 'column';
+  col.style.gap = '16px';
+
+  if (id) {
+    try {
+      const data = await apiFetch('/api/companies');
+      const c = (data.companies || []).find(x => x.id === id);
+      if (!c) return;
+      title.textContent = 'Editar Empresa';
+      document.getElementById('companyFormId').value = c.id;
+      document.getElementById('compCnpj').value = c.cnpj;
+      document.getElementById('compNome').value = c.nome;
+      document.getElementById('compTelefone').value = c.telefone || '';
+      document.getElementById('compEmail').value = c.email || '';
+      document.getElementById('compMetodo').value = c.metodoPadrao || 'boleto';
+      document.getElementById('compObservacao').value = c.observacao || '';
+    } catch { showToast('Erro ao carregar empresa', 'error'); }
+  } else {
+    title.textContent = 'Nova Empresa';
+    document.getElementById('companyFormId').value = '';
+    document.getElementById('compCnpj').value = '';
+    document.getElementById('compNome').value = '';
+    document.getElementById('compTelefone').value = '';
+    document.getElementById('compEmail').value = '';
+    document.getElementById('compMetodo').value = 'boleto';
+    document.getElementById('compObservacao').value = '';
+  }
+}
+
+function closeCompanyForm() {
+  document.getElementById('companyFormCol').style.display = 'none';
+}
+
+async function saveCompany() {
+  const id = document.getElementById('companyFormId').value;
+  const body = {
+    cnpj: document.getElementById('compCnpj').value.trim(),
+    nome: document.getElementById('compNome').value.trim(),
+    telefone: document.getElementById('compTelefone').value.trim(),
+    email: document.getElementById('compEmail').value.trim(),
+    metodoPadrao: document.getElementById('compMetodo').value,
+    observacao: document.getElementById('compObservacao').value.trim()
+  };
+  if (!body.cnpj || !body.nome) { showToast('CNPJ e nome são obrigatórios', 'error'); return; }
+  try {
+    if (id) {
+      await apiFetch(`/api/companies?id=${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      showToast('Empresa atualizada', 'success');
+    } else {
+      await apiFetch('/api/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      showToast('Empresa cadastrada', 'success');
+    }
+    closeCompanyForm();
+    loadCompanies();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteCompany(id, nome) {
+  if (!confirm(`Excluir "${nome}"?`)) return;
+  try {
+    await apiFetch(`/api/companies?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    showToast('Empresa removida', 'success');
+    loadCompanies();
+  } catch (err) { showToast(err.message, 'error'); }
 }

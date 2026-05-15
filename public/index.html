@@ -38,6 +38,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 3.18-1.65 5.97-4.13 7.57L17 22H7l.13-3.43A9 9 0 0 1 12 2z"/><circle cx="12" cy="11" r="1"/></svg>
         Análise IA
       </button>
+      <button class="btn btn-ghost btn-sm" onclick="openCompaniesModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Empresas
+      </button>
       <button class="btn btn-outline btn-sm" onclick="openUploadModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar Arquivo
@@ -122,6 +126,12 @@
               <option value="09 - Baixa">Baixa</option>
               <option value="02 - Entrada confirmada">A Receber</option>
             </select>
+            <div class="period-filter">
+              <input type="date" id="filterDataInicio" class="filter-date" onchange="filterPayments()" title="Vencimento de" />
+              <span class="period-sep">—</span>
+              <input type="date" id="filterDataFim" class="filter-date" onchange="filterPayments()" title="Vencimento até" />
+              <button class="btn-clear-period" onclick="clearPeriod()" title="Limpar período">×</button>
+            </div>
           </div>
         </div>
         <div class="table-wrapper">
@@ -289,6 +299,13 @@
             </select>
           </div>
           <div class="form-group">
+            <label class="form-label">Método de Pagamento</label>
+            <select id="editMetodoPagamento" class="form-input form-select">
+              <option value="boleto">Boleto</option>
+              <option value="pix">PIX</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label class="form-label">Data de Ocorrência</label>
             <input type="text" id="editDataOcorrencia" class="form-input" placeholder="dd/mm/aaaa" />
           </div>
@@ -357,6 +374,74 @@
       <div id="aiLoading" class="ai-loading hidden">
         <div class="ai-spinner"></div>
         <p>Analisando dados com IA…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Companies Modal -->
+  <div id="companiesModal" class="modal-overlay" onclick="closeCompaniesModal(event)">
+    <div class="modal-card modal-card-xl">
+      <div class="modal-header">
+        <h2 class="modal-title">Empresas Cadastradas</h2>
+        <button class="modal-close" onclick="closeCompaniesModalDirect()">×</button>
+      </div>
+      <div class="modal-body" style="padding-top:0">
+        <div class="companies-layout">
+          <!-- Lista -->
+          <div class="companies-list-col">
+            <div class="companies-list-head">
+              <span class="companies-count" id="companiesCount">0 empresas</span>
+              <button class="btn btn-primary btn-sm" onclick="openCompanyForm()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nova Empresa
+              </button>
+            </div>
+            <div id="companiesList" class="companies-list">
+              <p class="empty-state">Nenhuma empresa cadastrada</p>
+            </div>
+          </div>
+          <!-- Form -->
+          <div class="company-form-col" id="companyFormCol" style="display:none">
+            <h4 class="company-form-title" id="companyFormTitle">Nova Empresa</h4>
+            <input type="hidden" id="companyFormId" />
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">CNPJ / CPF *</label>
+                <input type="text" id="compCnpj" class="form-input" placeholder="00.000.000/0001-00" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Método Padrão</label>
+                <select id="compMetodo" class="form-input form-select">
+                  <option value="boleto">Boleto</option>
+                  <option value="pix">PIX</option>
+                </select>
+              </div>
+              <div class="form-group form-full">
+                <label class="form-label">Razão Social / Nome *</label>
+                <input type="text" id="compNome" class="form-input" placeholder="Nome da empresa" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Telefone</label>
+                <input type="text" id="compTelefone" class="form-input" placeholder="(00) 00000-0000" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">E-mail</label>
+                <input type="email" id="compEmail" class="form-input" placeholder="contato@empresa.com" />
+              </div>
+              <div class="form-group form-full">
+                <label class="form-label">Observação</label>
+                <input type="text" id="compObservacao" class="form-input" placeholder="Opcional…" />
+              </div>
+            </div>
+            <div class="company-form-actions">
+              <button class="btn btn-ghost btn-sm" onclick="closeCompanyForm()">Cancelar</button>
+              <button class="btn btn-primary btn-sm" onclick="saveCompany()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

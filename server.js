@@ -99,6 +99,7 @@ function parseExcel(buffer, fileName) {
       valorBoleto: parseFloat2(r[12]),
       numeroBoleto: String(r[14] || ''),
       dataVencimento: String(r[19] || ''),
+      metodoPagamento: 'boleto',
       observacao: '',
       fileName,
       uploadedAt: new Date().toISOString()
@@ -251,13 +252,21 @@ app.get('/api/company', async (req, res) => {
 app.get('/api/payments', async (req, res) => {
   try {
     const data = await loadData();
-    const { page = 1, limit = 50, search = '', ocorrencia = '' } = req.query;
+    const { page = 1, limit = 50, search = '', ocorrencia = '', dataInicio, dataFim } = req.query;
     let filtered = data.payments;
     if (search) {
       const s = search.toLowerCase();
       filtered = filtered.filter(p => p.pagador.toLowerCase().includes(s) || p.nossoNumero.includes(s));
     }
     if (ocorrencia) filtered = filtered.filter(p => p.ocorrencia === ocorrencia);
+    if (dataInicio) {
+      const di = new Date(dataInicio);
+      filtered = filtered.filter(p => { const d = parseDate(p.dataVencimento); return d && d >= di; });
+    }
+    if (dataFim) {
+      const df = new Date(dataFim + 'T23:59:59');
+      filtered = filtered.filter(p => { const d = parseDate(p.dataVencimento); return d && d <= df; });
+    }
 
     filtered.sort((a, b) => (parseDate(b.dataOcorrencia) || 0) - (parseDate(a.dataOcorrencia) || 0));
 
@@ -286,6 +295,7 @@ app.put('/api/payments', async (req, res) => {
       dataOcorrencia: req.body.dataOcorrencia ?? old.dataOcorrencia,
       ocorrencia: req.body.ocorrencia ?? old.ocorrencia,
       observacao: req.body.observacao ?? old.observacao,
+      metodoPagamento: req.body.metodoPagamento ?? old.metodoPagamento ?? 'boleto',
     };
     updated.id = `${updated.nossoNumero}_${updated.ocorrencia}`;
     data.payments[idx] = updated;
@@ -411,6 +421,59 @@ Forneça: 1) Resumo Executivo (2-3 linhas) 2) Pontos de Atenção (lista com emo
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Companies CRUD
+app.get('/api/companies', async (req, res) => {
+  try {
+    const data = await loadData();
+    res.json({ companies: data.companies || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/companies', async (req, res) => {
+  try {
+    const data = await loadData();
+    if (!data.companies) data.companies = [];
+    const company = {
+      id: Date.now().toString(),
+      cnpj: (req.body.cnpj || '').trim(),
+      nome: (req.body.nome || '').trim(),
+      telefone: (req.body.telefone || '').trim(),
+      email: (req.body.email || '').trim(),
+      metodoPadrao: req.body.metodoPadrao || 'boleto',
+      observacao: (req.body.observacao || '').trim(),
+      criadoEm: new Date().toISOString()
+    };
+    if (!company.cnpj || !company.nome) return res.status(400).json({ error: 'CNPJ e nome são obrigatórios' });
+    data.companies.push(company);
+    await saveData(data);
+    res.json({ success: true, company });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/companies', async (req, res) => {
+  try {
+    const id = req.query.id;
+    const data = await loadData();
+    const idx = (data.companies || []).findIndex(c => c.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Empresa não encontrada' });
+    data.companies[idx] = { ...data.companies[idx], ...req.body, id };
+    await saveData(data);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/companies', async (req, res) => {
+  try {
+    const id = req.query.id;
+    const data = await loadData();
+    const before = (data.companies || []).length;
+    data.companies = (data.companies || []).filter(c => c.id !== id);
+    if (data.companies.length === before) return res.status(404).json({ error: 'Empresa não encontrada' });
+    await saveData(data);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/clear', async (req, res) => {
