@@ -27,19 +27,19 @@ function initCharts() {
 
   chartOcorrencia = new Chart(document.getElementById('chartOcorrencia'), {
     type: 'doughnut',
-    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: '#080b14', hoverOffset: 6 }] },
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: '#ffffff', hoverOffset: 6 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       cutout: '68%',
       plugins: {
         legend: {
           position: 'bottom',
-          labels: { color: '#9ca3af', font: { family: 'Inter', size: 12 }, boxWidth: 12, padding: 16 }
+          labels: { color: '#64748b', font: { family: 'Inter', size: 12 }, boxWidth: 12, padding: 16 }
         },
         tooltip: {
-          backgroundColor: '#0f1422',
-          borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-          titleColor: '#e8eaed', bodyColor: '#9ca3af',
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1,
+          titleColor: '#1e293b', bodyColor: '#64748b',
           padding: 12, cornerRadius: 8,
           callbacks: {
             label: ctx => ` R$ ${ctx.parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — ${ctx.label}`
@@ -98,9 +98,9 @@ function animateValue(id, target, formatter) {
 
 function updateChart(data) {
   const ocColors = {
-    '06 - Liquidação sem Float': '#10b981',
-    '09 - Baixa': '#ef4444',
-    '02 - Entrada confirmada': '#f59e0b'
+    '06 - Liquidação sem Float': '#059669',
+    '09 - Baixa': '#dc2626',
+    '02 - Entrada confirmada': '#b45309'
   };
   const ocLabels = {
     '06 - Liquidação sem Float': 'Liquidado',
@@ -406,8 +406,8 @@ function renderDrawerChart(monthly) {
         {
           label: 'Recebido',
           data: monthly.map(m => m.liquidado),
-          backgroundColor: 'rgba(16,185,129,0.75)',
-          borderColor: '#10b981',
+          backgroundColor: 'rgba(5,150,105,0.7)',
+          borderColor: '#059669',
           borderWidth: 1,
           borderRadius: 4,
           borderSkipped: false,
@@ -415,8 +415,8 @@ function renderDrawerChart(monthly) {
         {
           label: 'Baixa',
           data: monthly.map(m => m.baixa),
-          backgroundColor: 'rgba(239,68,68,0.7)',
-          borderColor: '#ef4444',
+          backgroundColor: 'rgba(220,38,38,0.65)',
+          borderColor: '#dc2626',
           borderWidth: 1,
           borderRadius: 4,
           borderSkipped: false,
@@ -424,8 +424,8 @@ function renderDrawerChart(monthly) {
         {
           label: 'A Receber',
           data: monthly.map(m => m.areceber),
-          backgroundColor: 'rgba(245,158,11,0.7)',
-          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(180,83,9,0.65)',
+          borderColor: '#b45309',
           borderWidth: 1,
           borderRadius: 4,
           borderSkipped: false,
@@ -437,12 +437,12 @@ function renderDrawerChart(monthly) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: { color: '#9ca3af', font: { family: 'Inter', size: 11 }, boxWidth: 10, padding: 12 }
+          labels: { color: '#64748b', font: { family: 'Inter', size: 11 }, boxWidth: 10, padding: 12 }
         },
         tooltip: {
-          backgroundColor: '#0f1422',
-          borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-          titleColor: '#e8eaed', bodyColor: '#9ca3af',
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1,
+          titleColor: '#1e293b', bodyColor: '#64748b',
           padding: 10, cornerRadius: 8,
           callbacks: {
             label: ctx => ` ${ctx.dataset.label}: R$ ${ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
@@ -452,17 +452,17 @@ function renderDrawerChart(monthly) {
       scales: {
         x: {
           stacked: false,
-          ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 0 },
+          ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 0 },
           grid: { display: false },
-          border: { color: 'rgba(255,255,255,0.08)' }
+          border: { color: 'rgba(0,0,0,0.1)' }
         },
         y: {
           ticks: {
-            color: '#6b7280', font: { size: 10 },
+            color: '#64748b', font: { size: 10 },
             callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { notation: 'compact' })
           },
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          border: { color: 'rgba(255,255,255,0.08)' }
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          border: { color: 'rgba(0,0,0,0.1)' }
         }
       }
     }
