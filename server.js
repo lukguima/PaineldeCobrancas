@@ -153,8 +153,8 @@ let wppQr = null;
 
 async function initWhatsApp() {
   try {
-    const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-    const { Boom } = require('@hapi/boom');
+    const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = await import('@whiskeysockets/baileys');
+    const { Boom } = await import('@hapi/boom');
     const QRCode = require('qrcode');
     const pino = require('pino');
 
@@ -206,8 +206,9 @@ async function initWhatsApp() {
 
     wppClient = sock;
   } catch (err) {
-    console.error('Erro ao inicializar WhatsApp:', err.message);
-    wppStatus = 'disconnected';
+    console.error('Erro ao inicializar WhatsApp:', err.message, err.stack);
+    wppStatus = 'error';
+    wppQr = null;
   }
 }
 
@@ -718,7 +719,7 @@ app.get('/api/whatsapp/qr', (req, res) => {
 });
 
 app.post('/api/whatsapp/connect', (req, res) => {
-  if (wppStatus === 'disconnected') initWhatsApp();
+  if (wppStatus === 'disconnected' || wppStatus === 'error') initWhatsApp();
   res.json({ status: wppStatus });
 });
 

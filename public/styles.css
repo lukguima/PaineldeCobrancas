@@ -830,6 +830,7 @@ body {
 .wpp-dot-green  { background: var(--green); box-shadow: 0 0 5px var(--green-glow); }
 .wpp-dot-amber  { background: var(--amber); }
 .wpp-dot-gray   { background: #cbd5e1; }
+.wpp-dot-red    { background: #ef4444; }
 
 /* ===== WHATSAPP MODAL ===== */
 .modal-card-wpp { max-width: 600px; }
@@ -861,6 +862,7 @@ body {
 .wpp-dot-green  { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
 .wpp-dot-amber  { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); }
 .wpp-dot-gray   { background: #94a3b8; }
+.wpp-dot-red    { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.4); }
 
 .wpp-status-label { font-size: 14px; font-weight: 600; color: var(--text); }
 .wpp-status-sub   { font-size: 12px; color: var(--text-muted); margin-top: 1px; }

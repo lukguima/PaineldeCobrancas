@@ -946,6 +946,11 @@ function applyWppStatus(status) {
     label.textContent = 'Conectando…';
     sub.textContent = 'Iniciando sessão WhatsApp';
     disconnectBtn.style.display = '';
+  } else if (status === 'error') {
+    dot.classList.add('wpp-dot-red');
+    label.textContent = 'Erro ao conectar';
+    sub.textContent = 'Falha ao inicializar o WhatsApp. Verifique os logs do servidor.';
+    connectBtn.style.display = '';
   } else {
     dot.classList.add('wpp-dot-gray');
     label.textContent = 'Desconectado';
