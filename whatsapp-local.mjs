@@ -1,4 +1,4 @@
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import express from 'express';
 import fs from 'fs';
@@ -48,10 +48,13 @@ async function initWhatsApp() {
     if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    const { version } = await fetchLatestBaileysVersion();
+    console.log('[WPP] Versão WA Web:', version.join('.'));
 
     const sock = makeWASocket({
+      version,
       auth: state,
-      browser: ['Painel Cobranças', 'Chrome', '1.0.0'],
+      browser: Browsers.macOS('Desktop'),
       logger: { level:'silent', trace(){}, debug(){}, info(){}, warn(){}, error(){}, fatal(){}, child(){ return this; } }
     });
 
