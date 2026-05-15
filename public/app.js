@@ -552,7 +552,7 @@ async function uploadFile(file) {
           ${data.skipped > 0 ? `<br><span style="font-size:13px;opacity:.8">${data.skipped} ignorados (sem alteração)</span>` : ''}
           <br><span style="font-size:13px;opacity:.8">Total no banco: ${data.total} registros</span>`;
         resultEl.classList.remove('hidden');
-        loadDashboard(); loadPayments();
+        loadDashboard(); loadPayments(); loadAlerts();
         const toastMsg = [data.added > 0 ? `${data.added} novos` : '', data.updated > 0 ? `${data.updated} atualizados` : ''].filter(Boolean).join(', ');
         showToast(toastMsg || 'Arquivo processado', 'success');
       }, 600);
