@@ -145,59 +145,66 @@ function statusPriority(ocorrencia) {
   return 1;
 }
 
-/* ===== WHATSAPP ===== */
+/* ===== WHATSAPP (Baileys) ===== */
 
 let wppClient = null;
 let wppStatus = 'disconnected'; // 'disconnected' | 'qr' | 'connecting' | 'ready'
 let wppQr = null;
 
-function initWhatsApp() {
+async function initWhatsApp() {
   try {
-    const { Client, LocalAuth } = require('whatsapp-web.js');
+    const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+    const { Boom } = require('@hapi/boom');
     const QRCode = require('qrcode');
+    const pino = require('pino');
 
     if (wppClient) {
-      try { wppClient.destroy(); } catch {}
+      try { wppClient.end(); } catch {}
       wppClient = null;
     }
 
     wppStatus = 'connecting';
     wppQr = null;
 
-    wppClient = new Client({
-      authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, 'data', 'wpp-session')
-      }),
-      puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    const sessionPath = path.join(__dirname, 'data', 'wpp-session');
+    if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+
+    const sock = makeWASocket({
+      auth: state,
+      logger: pino({ level: 'silent' }),
+      printQRInTerminal: false,
+      browser: ['Painel Cobranças', 'Chrome', '1.0.0'],
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        wppStatus = 'qr';
+        try { wppQr = await QRCode.toDataURL(qr); } catch {}
+      }
+
+      if (connection === 'close') {
+        const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        if (code !== DisconnectReason.loggedOut) {
+          initWhatsApp();
+        } else {
+          wppStatus = 'disconnected';
+          wppClient = null;
+          wppQr = null;
+        }
+      } else if (connection === 'open') {
+        wppStatus = 'ready';
+        wppQr = null;
+        console.log('WhatsApp conectado (Baileys)');
       }
     });
 
-    wppClient.on('qr', async (qr) => {
-      wppStatus = 'qr';
-      try { wppQr = await QRCode.toDataURL(qr); } catch {}
-    });
+    sock.ev.on('creds.update', saveCreds);
 
-    wppClient.on('ready', () => {
-      wppStatus = 'ready';
-      wppQr = null;
-      console.log('WhatsApp conectado');
-    });
-
-    wppClient.on('auth_failure', () => {
-      wppStatus = 'disconnected';
-      wppQr = null;
-      wppClient = null;
-    });
-
-    wppClient.on('disconnected', () => {
-      wppStatus = 'disconnected';
-      wppQr = null;
-      wppClient = null;
-    });
-
-    wppClient.initialize();
+    wppClient = sock;
   } catch (err) {
     console.error('Erro ao inicializar WhatsApp:', err.message);
     wppStatus = 'disconnected';
@@ -275,7 +282,7 @@ async function enviarCobrancas(tipo) {
     else                       msg = TEMPLATES.atraso(nome, valorFmt, p.dataVencimento, diasAtraso);
 
     try {
-      await wppClient.sendMessage(`${telefone}@c.us`, msg);
+      await wppClient.sendMessage(`${telefone}@s.whatsapp.net`, { text: msg });
       data.cobrancasLog.unshift({
         nossoNumero: p.nossoNumero,
         tipo,
@@ -719,7 +726,7 @@ app.post('/api/whatsapp/disconnect', async (req, res) => {
   try {
     if (wppClient) {
       await wppClient.logout();
-      await wppClient.destroy();
+      wppClient.end();
     }
   } catch {}
   wppClient = null;

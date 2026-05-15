@@ -3,3 +3,6 @@ data/
 .env
 *.xlsx
 *.xls
+
+.vercel
+.env*.local
