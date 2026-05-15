@@ -193,9 +193,12 @@ async function initWhatsApp() {
       }
 
       if (connection === 'close') {
-        const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        const err = lastDisconnect?.error;
+        const code = new Boom(err)?.output?.statusCode;
+        console.log('[WPP] Conexão fechada. Código:', code, '| Motivo:', err?.message || 'desconhecido');
         if (code !== DisconnectReason.loggedOut) {
-          initWhatsApp();
+          console.log('[WPP] Tentando reconectar em 5s...');
+          setTimeout(() => initWhatsApp(), 5000);
         } else {
           wppStatus = 'disconnected';
           wppClient = null;
