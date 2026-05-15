@@ -877,13 +877,21 @@ async function deleteCompany(id, nome) {
 
 /* ===== WHATSAPP ===== */
 
+const WPP_AGENT = 'http://localhost:3001';
+
 let wppPolling = null;
+
+async function wppFetch(path, opts = {}) {
+  const res = await fetch(`${WPP_AGENT}${path}`, { ...opts, headers: { 'Content-Type': 'application/json' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 function openWppModal() {
   document.getElementById('wppModal').classList.add('open');
   wppCheckStatus();
   loadWppLog();
-  wppPolling = setInterval(wppCheckStatus, 4000);
+  wppPolling = setInterval(wppCheckStatus, 3000);
 }
 
 function closeWppModal(e) {
@@ -898,10 +906,10 @@ function closeWppModalDirect() {
 
 async function wppCheckStatus() {
   try {
-    const data = await apiFetch('/api/whatsapp/status');
+    const data = await wppFetch('/status');
     applyWppStatus(data.status);
     if (data.status === 'qr') {
-      const qrData = await apiFetch('/api/whatsapp/qr').catch(() => null);
+      const qrData = await wppFetch('/qr').catch(() => null);
       if (qrData?.qr) {
         document.getElementById('wppQrImg').src = qrData.qr;
         document.getElementById('wppQrImg').style.display = 'block';
@@ -909,17 +917,20 @@ async function wppCheckStatus() {
       }
     }
     updateHeaderWppDot(data.status);
-  } catch {}
+  } catch {
+    applyWppStatus('agent_offline');
+    updateHeaderWppDot('disconnected');
+  }
 }
 
 function applyWppStatus(status) {
-  const dot = document.getElementById('wppStatusDot');
-  const label = document.getElementById('wppStatusLabel');
-  const sub = document.getElementById('wppStatusSub');
-  const connectBtn = document.getElementById('wppConnectBtn');
-  const disconnectBtn = document.getElementById('wppDisconnectBtn');
-  const qrSection = document.getElementById('wppQrSection');
-  const chargeSection = document.getElementById('wppChargeSection');
+  const dot          = document.getElementById('wppStatusDot');
+  const label        = document.getElementById('wppStatusLabel');
+  const sub          = document.getElementById('wppStatusSub');
+  const connectBtn   = document.getElementById('wppConnectBtn');
+  const disconnectBtn= document.getElementById('wppDisconnectBtn');
+  const qrSection    = document.getElementById('wppQrSection');
+  const chargeSection= document.getElementById('wppChargeSection');
 
   dot.className = 'wpp-status-dot-lg';
   qrSection.style.display = 'none';
@@ -949,8 +960,13 @@ function applyWppStatus(status) {
   } else if (status === 'error') {
     dot.classList.add('wpp-dot-red');
     label.textContent = 'Erro ao conectar';
-    sub.textContent = 'Falha ao inicializar o WhatsApp. Verifique os logs do servidor.';
+    sub.textContent = 'Reinicie o agente local: npm run wpp';
     connectBtn.style.display = '';
+  } else if (status === 'agent_offline') {
+    dot.classList.add('wpp-dot-gray');
+    label.textContent = 'Agente offline';
+    sub.textContent = 'Execute "npm run wpp" no seu computador para ativar';
+    connectBtn.style.display = 'none';
   } else {
     dot.classList.add('wpp-dot-gray');
     label.textContent = 'Desconectado';
@@ -970,15 +986,15 @@ function updateHeaderWppDot(status) {
 
 async function wppConnect() {
   try {
-    await apiFetch('/api/whatsapp/connect', { method: 'POST' });
+    await wppFetch('/connect', { method: 'POST' });
     wppCheckStatus();
-  } catch (err) { showToast(err.message, 'error'); }
+  } catch { showToast('Agente local offline. Execute: npm run wpp', 'error'); }
 }
 
 async function wppDisconnect() {
   if (!confirm('Desconectar o WhatsApp?')) return;
   try {
-    await apiFetch('/api/whatsapp/disconnect', { method: 'POST' });
+    await wppFetch('/disconnect', { method: 'POST' });
     applyWppStatus('disconnected');
     updateHeaderWppDot('disconnected');
     showToast('WhatsApp desconectado', 'info');
@@ -990,17 +1006,17 @@ async function wppEnviar(tipo) {
   if (!confirm(`Enviar ${labels[tipo]} agora?`)) return;
   try {
     showToast('Enviando mensagens…', 'info');
-    const r = await apiFetch(`/api/cobrancas/enviar?tipo=${tipo}`, { method: 'POST' });
-    showToast(`${r.enviados} mensagem(ns) enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`, r.enviados > 0 ? 'success' : 'info');
+    const r = await wppFetch(`/enviar?tipo=${tipo}`, { method: 'POST' });
+    showToast(`${r.enviados} enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`, r.enviados > 0 ? 'success' : 'info');
     loadWppLog();
-  } catch (err) { showToast(err.message, 'error'); }
+  } catch { showToast('Agente local offline. Execute: npm run wpp', 'error'); }
 }
 
 async function loadWppLog() {
   const el = document.getElementById('wppLog');
   if (!el) return;
   try {
-    const data = await apiFetch('/api/cobrancas/log');
+    const data = await wppFetch('/log').catch(() => ({ log: [] }));
     const log = data.log || [];
     if (log.length === 0) {
       el.innerHTML = '<p class="empty-state" style="padding:16px">Nenhum envio registrado</p>';
