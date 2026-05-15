@@ -51,7 +51,6 @@ async function initWhatsApp() {
 
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: true,
       browser: ['Painel Cobranças', 'Chrome', '1.0.0'],
       logger: { level:'silent', trace(){}, debug(){}, info(){}, warn(){}, error(){}, fatal(){}, child(){ return this; } }
     });
@@ -62,7 +61,7 @@ async function initWhatsApp() {
       if (qr) {
         wppStatus = 'qr';
         try { wppQr = await QRCode.toDataURL(qr); } catch {}
-        console.log('\n[WPP] QR gerado — escaneie pelo dashboard ou pelo terminal acima.\n');
+        console.log('[WPP] QR gerado — abra o dashboard e clique em Conectar para escanear.');
       }
       if (connection === 'open') {
         wppStatus = 'ready';
@@ -71,14 +70,23 @@ async function initWhatsApp() {
       }
       if (connection === 'close') {
         const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        if (code === DisconnectReason.loggedOut) {
+        console.log('[WPP] Conexão fechada. Código:', code);
+
+        const clearAndRetry = () => {
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+          fs.mkdirSync(sessionPath, { recursive: true });
+          console.log('[WPP] Sessão limpa. Reiniciando para gerar QR...');
+          setTimeout(() => initWhatsApp(), 2000);
+        };
+
+        if (code === DisconnectReason.loggedOut || code === 401) {
           wppStatus = 'disconnected';
           wppClient = null;
-          const sessionPath = path.join(__dirname, 'data', 'wpp-session-local');
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-          console.log('[WPP] Sessão encerrada (logout).');
+          clearAndRetry();
+        } else if (code === DisconnectReason.badSession || code === 500) {
+          clearAndRetry();
         } else {
-          console.log('[WPP] Conexão caiu, reconectando em 5s...');
+          console.log('[WPP] Reconectando em 5s...');
           setTimeout(() => initWhatsApp(), 5000);
         }
       }
