@@ -820,3 +820,110 @@ body {
 .company-form-col { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .company-form-title { font-size: 14px; font-weight: 700; color: var(--text); padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .company-form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
+
+/* ===== WHATSAPP HEADER BUTTON ===== */
+.wpp-btn { position: relative; }
+.wpp-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid #fff;
+}
+.wpp-dot-green  { background: var(--green); box-shadow: 0 0 5px var(--green-glow); }
+.wpp-dot-amber  { background: var(--amber); }
+.wpp-dot-gray   { background: #cbd5e1; }
+
+/* ===== WHATSAPP MODAL ===== */
+.modal-card-wpp { max-width: 600px; }
+
+.wpp-modal-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(37,211,102,0.1);
+  border: 1px solid rgba(37,211,102,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: #25d366;
+}
+
+.wpp-modal-body {
+  padding: 0 24px 24px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+/* status row */
+.wpp-status-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  margin-top: 16px;
+}
+.wpp-status-info { display: flex; align-items: center; gap: 12px; }
+.wpp-status-dot-lg {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+}
+.wpp-dot-green  { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+.wpp-dot-amber  { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); }
+.wpp-dot-gray   { background: #94a3b8; }
+
+.wpp-status-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.wpp-status-sub   { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.wpp-actions-row  { display: flex; gap: 8px; }
+
+/* QR code */
+.wpp-qr-section {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.wpp-qr-hint {
+  font-size: 13px; color: var(--text-sub); text-align: center; line-height: 1.5;
+}
+.wpp-qr-wrap {
+  position: relative; width: 220px; height: 220px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border); border-radius: 12px;
+  background: #fff;
+}
+.wpp-qr-img {
+  width: 200px; height: 200px; border-radius: 8px;
+  object-fit: contain;
+}
+.wpp-qr-spinner {
+  position: absolute;
+}
+
+/* charge buttons */
+.wpp-charge-section {
+  padding: 14px 16px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+}
+.wpp-charge-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.wpp-charge-hint  { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.wpp-charge-btns  { display: flex; gap: 8px; flex-wrap: wrap; }
+.wpp-charge-btn   { flex: 1; min-width: 120px; justify-content: center; }
+.wpp-charge-atraso { color: var(--red) !important; border-color: rgba(220,38,38,0.3) !important; }
+.wpp-charge-atraso:hover { background: var(--red-dim) !important; }
+
+/* log */
+.wpp-log-section {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+}
+.wpp-log-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.wpp-log-title { font-size: 12px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.wpp-log-list  { max-height: 220px; overflow-y: auto; }
+.wpp-log-item  {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 13px;
+}
+.wpp-log-item:last-child { border-bottom: none; }
+.wpp-log-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.wpp-log-aviso  { background: var(--amber-dim); color: var(--amber); }
+.wpp-log-venc   { background: var(--cyan-dim);  color: var(--cyan); }
+.wpp-log-atraso { background: var(--red-dim);   color: var(--red); }
+.wpp-log-info   { flex: 1; min-width: 0; }
+.wpp-log-nome   { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wpp-log-meta   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.wpp-log-dt     { font-size: 11px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }

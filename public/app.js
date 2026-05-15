@@ -564,9 +564,16 @@ async function uploadFile(file) {
       setTimeout(() => {
         progress.classList.add('hidden');
         resultEl.className = 'upload-result result-success';
-        resultEl.innerHTML = `✅ <strong>${data.added} registros novos</strong>
+        const elevMsg = data.elevadosNoPeriodo > 0
+        ? `<br><span style="font-size:13px;color:#0284c7">ℹ️ ${data.elevadosNoPeriodo} boleto(s) apareceram como pendente (02) e pago (06) no mesmo arquivo — salvos como <strong>Liquidado</strong></span>`
+        : '';
+      const semVencMsg = data.semVencimento > 0
+        ? `<br><span style="font-size:13px;color:#b45309">⚠️ ${data.semVencimento} boleto(s) "A Receber" sem data de vencimento — não aparecerão nos alertas de atraso</span>`
+        : '';
+      resultEl.innerHTML = `✅ <strong>${data.added} registros novos</strong>
           ${data.updated > 0 ? `<br><span style="font-size:13px;opacity:.8">↑ ${data.updated} boletos atualizados (status superior)</span>` : ''}
           ${data.skipped > 0 ? `<br><span style="font-size:13px;opacity:.8">${data.skipped} ignorados (sem alteração)</span>` : ''}
+          ${elevMsg}${semVencMsg}
           <br><span style="font-size:13px;opacity:.8">Total no banco: ${data.total} registros</span>`;
         resultEl.classList.remove('hidden');
         loadDashboard(); loadPayments(); loadAlerts();
@@ -867,3 +874,153 @@ async function deleteCompany(id, nome) {
     loadCompanies();
   } catch (err) { showToast(err.message, 'error'); }
 }
+
+/* ===== WHATSAPP ===== */
+
+let wppPolling = null;
+
+function openWppModal() {
+  document.getElementById('wppModal').classList.add('open');
+  wppCheckStatus();
+  loadWppLog();
+  wppPolling = setInterval(wppCheckStatus, 4000);
+}
+
+function closeWppModal(e) {
+  if (e.target === document.getElementById('wppModal')) closeWppModalDirect();
+}
+
+function closeWppModalDirect() {
+  document.getElementById('wppModal').classList.remove('open');
+  clearInterval(wppPolling);
+  wppPolling = null;
+}
+
+async function wppCheckStatus() {
+  try {
+    const data = await apiFetch('/api/whatsapp/status');
+    applyWppStatus(data.status);
+    if (data.status === 'qr') {
+      const qrData = await apiFetch('/api/whatsapp/qr').catch(() => null);
+      if (qrData?.qr) {
+        document.getElementById('wppQrImg').src = qrData.qr;
+        document.getElementById('wppQrImg').style.display = 'block';
+        document.getElementById('wppQrSpinner').style.display = 'none';
+      }
+    }
+    updateHeaderWppDot(data.status);
+  } catch {}
+}
+
+function applyWppStatus(status) {
+  const dot = document.getElementById('wppStatusDot');
+  const label = document.getElementById('wppStatusLabel');
+  const sub = document.getElementById('wppStatusSub');
+  const connectBtn = document.getElementById('wppConnectBtn');
+  const disconnectBtn = document.getElementById('wppDisconnectBtn');
+  const qrSection = document.getElementById('wppQrSection');
+  const chargeSection = document.getElementById('wppChargeSection');
+
+  dot.className = 'wpp-status-dot-lg';
+  qrSection.style.display = 'none';
+  chargeSection.style.display = 'none';
+  connectBtn.style.display = 'none';
+  disconnectBtn.style.display = 'none';
+
+  if (status === 'ready') {
+    dot.classList.add('wpp-dot-green');
+    label.textContent = 'Conectado';
+    sub.textContent = 'WhatsApp vinculado e pronto para enviar cobranças';
+    disconnectBtn.style.display = '';
+    chargeSection.style.display = '';
+  } else if (status === 'qr') {
+    dot.classList.add('wpp-dot-amber');
+    label.textContent = 'Aguardando QR Code';
+    sub.textContent = 'Escaneie o código abaixo com o WhatsApp do celular';
+    qrSection.style.display = '';
+    document.getElementById('wppQrImg').style.display = 'none';
+    document.getElementById('wppQrSpinner').style.display = '';
+    disconnectBtn.style.display = '';
+  } else if (status === 'connecting') {
+    dot.classList.add('wpp-dot-amber');
+    label.textContent = 'Conectando…';
+    sub.textContent = 'Iniciando sessão WhatsApp';
+    disconnectBtn.style.display = '';
+  } else {
+    dot.classList.add('wpp-dot-gray');
+    label.textContent = 'Desconectado';
+    sub.textContent = 'Clique em Conectar para vincular o WhatsApp';
+    connectBtn.style.display = '';
+  }
+}
+
+function updateHeaderWppDot(status) {
+  const dot = document.getElementById('wppDot');
+  if (!dot) return;
+  dot.className = 'wpp-dot';
+  if (status === 'ready')      dot.classList.add('wpp-dot-green');
+  else if (status === 'qr' || status === 'connecting') dot.classList.add('wpp-dot-amber');
+  else dot.classList.add('wpp-dot-gray');
+}
+
+async function wppConnect() {
+  try {
+    await apiFetch('/api/whatsapp/connect', { method: 'POST' });
+    wppCheckStatus();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function wppDisconnect() {
+  if (!confirm('Desconectar o WhatsApp?')) return;
+  try {
+    await apiFetch('/api/whatsapp/disconnect', { method: 'POST' });
+    applyWppStatus('disconnected');
+    updateHeaderWppDot('disconnected');
+    showToast('WhatsApp desconectado', 'info');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function wppEnviar(tipo) {
+  const labels = { aviso: 'avisos (vencimento amanhã)', vencimento: 'cobranças do dia', atraso: 'cobranças em atraso' };
+  if (!confirm(`Enviar ${labels[tipo]} agora?`)) return;
+  try {
+    showToast('Enviando mensagens…', 'info');
+    const r = await apiFetch(`/api/cobrancas/enviar?tipo=${tipo}`, { method: 'POST' });
+    showToast(`${r.enviados} mensagem(ns) enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`, r.enviados > 0 ? 'success' : 'info');
+    loadWppLog();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function loadWppLog() {
+  const el = document.getElementById('wppLog');
+  if (!el) return;
+  try {
+    const data = await apiFetch('/api/cobrancas/log');
+    const log = data.log || [];
+    if (log.length === 0) {
+      el.innerHTML = '<p class="empty-state" style="padding:16px">Nenhum envio registrado</p>';
+      return;
+    }
+    const tipoLabel = { aviso: 'Aviso', vencimento: 'Vencimento', atraso: 'Atraso' };
+    const tipoCls   = { aviso: 'wpp-log-aviso', vencimento: 'wpp-log-venc', atraso: 'wpp-log-atraso' };
+    el.innerHTML = log.map(l => {
+      const dt = new Date(l.sentAt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const valor = (l.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      return `<div class="wpp-log-item">
+        <span class="wpp-log-badge ${tipoCls[l.tipo] || ''}">${tipoLabel[l.tipo] || l.tipo}</span>
+        <div class="wpp-log-info">
+          <div class="wpp-log-nome">${l.nome}</div>
+          <div class="wpp-log-meta">${l.telefone} · ${valor} · venc. ${l.vencimento || '—'}</div>
+        </div>
+        <div class="wpp-log-dt">${dt}</div>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<p class="empty-state" style="padding:16px">Erro ao carregar log</p>';
+  }
+}
+
+// Carrega status do WhatsApp no header ao iniciar
+document.addEventListener('DOMContentLoaded', () => {
+  apiFetch('/api/whatsapp/status').then(d => updateHeaderWppDot(d.status)).catch(() => {});
+});

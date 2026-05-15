@@ -27,7 +27,6 @@ async function loadData() {
     if (doc) { const { _id, ...rest } = doc; return rest; }
     return { payments: [], uploads: [] };
   }
-  // Fallback local
   const file = path.join(__dirname, 'data', 'payments.json');
   if (!fs.existsSync(file)) return { payments: [], uploads: [] };
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -43,7 +42,6 @@ async function saveData(data) {
     );
     return;
   }
-  // Fallback local
   const dir = path.join(__dirname, 'data');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir);
   fs.writeFileSync(path.join(dir, 'payments.json'), JSON.stringify(data, null, 2));
@@ -77,28 +75,61 @@ function parseDate(str) {
   return new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
 }
 
+function normalizarTelefone(tel) {
+  const digits = tel.replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) return digits;
+  return '55' + digits;
+}
+
 function parseExcel(buffer, fileName) {
   const wb = XLSX.read(buffer, { type: 'buffer' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
   const payments = [];
-  for (let i = 1; i < rows.length; i++) {
+
+  // Detect header row: find the row that contains the NN column header
+  // to handle files that start with metadata rows before the real header
+  let startRow = 1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const cell = String(rows[i][1] || '').toLowerCase();
+    if (cell.includes('nn') || cell.includes('nosso') || cell.includes('número')) {
+      startRow = i + 1;
+      break;
+    }
+  }
+
+  for (let i = startRow; i < rows.length; i++) {
     const r = rows[i];
+    // Skip empty rows or section-header rows (which have no valid nossoNumero)
     if (!r[0]) continue;
+    const nn = String(r[1] || '').trim();
+    if (!nn) continue;
+    const ocorrencia = String(r[3] || '').trim();
+    // Skip rows that don't carry a recognized payment ocorrência
+    if (!ocorrencia.match(/0[269]/)) continue;
+
+    // dataVencimento: column 19 is the canonical due date.
+    // For "02 - Entrada confirmada" entries the bank sometimes omits it;
+    // fall back to dataDebito (r[7]) then to dataOcorrencia (r[4]).
+    const rawVenc = String(r[19] || '').trim();
+    const rawDeb  = String(r[7]  || '').trim();
+    const rawOcor = String(r[4]  || '').trim();
+    const dataVencimento = rawVenc || rawDeb || rawOcor;
+
     payments.push({
-      id: `${r[1]}_${r[3]}`,
+      id: `${nn}_${ocorrencia}`,
       pagador: String(r[0] || ''),
-      nossoNumero: String(r[1] || ''),
+      nossoNumero: nn,
       conta: String(r[2] || ''),
-      ocorrencia: String(r[3] || ''),
-      dataOcorrencia: String(r[4] || ''),
+      ocorrencia,
+      dataOcorrencia: rawOcor,
       tarifa: parseFloat2(r[5]),
       despesa: parseFloat2(r[6]),
-      dataDebito: String(r[7] || ''),
+      dataDebito: rawDeb,
       dataCredito: String(r[10] || ''),
       valorBoleto: parseFloat2(r[12]),
       numeroBoleto: String(r[14] || ''),
-      dataVencimento: String(r[19] || ''),
+      dataVencimento,
       metodoPagamento: 'boleto',
       observacao: '',
       fileName,
@@ -114,6 +145,162 @@ function statusPriority(ocorrencia) {
   return 1;
 }
 
+/* ===== WHATSAPP ===== */
+
+let wppClient = null;
+let wppStatus = 'disconnected'; // 'disconnected' | 'qr' | 'connecting' | 'ready'
+let wppQr = null;
+
+function initWhatsApp() {
+  try {
+    const { Client, LocalAuth } = require('whatsapp-web.js');
+    const QRCode = require('qrcode');
+
+    if (wppClient) {
+      try { wppClient.destroy(); } catch {}
+      wppClient = null;
+    }
+
+    wppStatus = 'connecting';
+    wppQr = null;
+
+    wppClient = new Client({
+      authStrategy: new LocalAuth({
+        dataPath: path.join(__dirname, 'data', 'wpp-session')
+      }),
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      }
+    });
+
+    wppClient.on('qr', async (qr) => {
+      wppStatus = 'qr';
+      try { wppQr = await QRCode.toDataURL(qr); } catch {}
+    });
+
+    wppClient.on('ready', () => {
+      wppStatus = 'ready';
+      wppQr = null;
+      console.log('WhatsApp conectado');
+    });
+
+    wppClient.on('auth_failure', () => {
+      wppStatus = 'disconnected';
+      wppQr = null;
+      wppClient = null;
+    });
+
+    wppClient.on('disconnected', () => {
+      wppStatus = 'disconnected';
+      wppQr = null;
+      wppClient = null;
+    });
+
+    wppClient.initialize();
+  } catch (err) {
+    console.error('Erro ao inicializar WhatsApp:', err.message);
+    wppStatus = 'disconnected';
+  }
+}
+
+/* ===== TEMPLATES DE COBRANÇA ===== */
+
+const TEMPLATES = {
+  aviso: (nome, valor, vencimento) =>
+    `Olá *${nome}*! 👋\n\nPassando para lembrar que você tem um boleto no valor de *R$ ${valor}* com vencimento *amanhã (${vencimento})*.\n\nEfetue o pagamento para evitar juros e multas.\n\n_Mensagem automática — não responda._`,
+
+  vencimento: (nome, valor, vencimento) =>
+    `Olá *${nome}*! 👋\n\nSeu boleto no valor de *R$ ${valor}* vence *hoje (${vencimento})*.\n\nEfetue o pagamento ainda hoje para evitar multas.\n\n_Mensagem automática — não responda._`,
+
+  atraso: (nome, valor, vencimento, dias) =>
+    `Olá *${nome}*! ⚠️\n\nIdentificamos que seu boleto de *R$ ${valor}* (vencimento: ${vencimento}) está em atraso há *${dias} dia${dias > 1 ? 's' : ''}*.\n\nEntre em contato para regularizar sua situação.\n\n_Mensagem automática — não responda._`
+};
+
+/* ===== ENVIO DE COBRANÇAS ===== */
+
+async function enviarCobrancas(tipo) {
+  if (wppStatus !== 'ready' || !wppClient) return { enviados: 0, erros: 0, pulados: 0 };
+
+  const data = await loadData();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  const companyMap = {};
+  (data.companies || []).forEach(c => { companyMap[c.cnpj] = c; });
+
+  const pendentes = data.payments.filter(p => p.ocorrencia.includes('02'));
+  if (!data.cobrancasLog) data.cobrancasLog = [];
+
+  const enviados_hoje = new Set(
+    data.cobrancasLog
+      .filter(l => l.data === todayStr)
+      .map(l => `${l.nossoNumero}_${l.tipo}`)
+  );
+
+  let enviados = 0, erros = 0, pulados = 0;
+
+  for (const p of pendentes) {
+    const venc = parseDate(p.dataVencimento);
+    if (!venc) { pulados++; continue; }
+
+    const diffDays = Math.round((venc - today) / (1000 * 60 * 60 * 24));
+
+    const deveEnviar = (
+      (tipo === 'aviso'      && diffDays === 1)  ||
+      (tipo === 'vencimento' && diffDays === 0)  ||
+      (tipo === 'atraso'     && diffDays < 0)
+    );
+
+    if (!deveEnviar) { pulados++; continue; }
+
+    const chave = `${p.nossoNumero}_${tipo}`;
+    if (enviados_hoje.has(chave)) { pulados++; continue; }
+
+    const cnpj = p.pagador.split(' - ')[0]?.trim();
+    const company = companyMap[cnpj];
+    if (!company?.telefone) { pulados++; continue; }
+
+    const telefone = normalizarTelefone(company.telefone);
+    if (telefone.length < 12) { pulados++; continue; }
+
+    const nome = company.nome;
+    const valorFmt = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const diasAtraso = Math.abs(diffDays);
+
+    let msg;
+    if (tipo === 'aviso')      msg = TEMPLATES.aviso(nome, valorFmt, p.dataVencimento);
+    else if (tipo === 'vencimento') msg = TEMPLATES.vencimento(nome, valorFmt, p.dataVencimento);
+    else                       msg = TEMPLATES.atraso(nome, valorFmt, p.dataVencimento, diasAtraso);
+
+    try {
+      await wppClient.sendMessage(`${telefone}@c.us`, msg);
+      data.cobrancasLog.unshift({
+        nossoNumero: p.nossoNumero,
+        tipo,
+        data: todayStr,
+        telefone,
+        nome,
+        valor: p.valorBoleto,
+        vencimento: p.dataVencimento,
+        sentAt: new Date().toISOString()
+      });
+      enviados_hoje.add(chave);
+      enviados++;
+    } catch {
+      erros++;
+    }
+  }
+
+  if (enviados > 0) {
+    data.cobrancasLog = data.cobrancasLog.slice(0, 500);
+    await saveData(data);
+  }
+
+  return { enviados, erros, pulados };
+}
+
 /* ===== ROTAS ===== */
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
@@ -121,10 +308,25 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const incoming = parseExcel(req.file.buffer, req.file.originalname);
     const data = await loadData();
 
+    const companyMap = {};
+    (data.companies || []).forEach(c => { companyMap[c.cnpj] = c; });
+    for (const p of incoming) {
+      const cnpj = p.pagador.split(' - ')[0]?.trim();
+      const registeredCompany = companyMap[cnpj];
+      if (registeredCompany) {
+        p.metodoPagamento = registeredCompany.metodoPadrao || 'boleto';
+      }
+    }
+
     const byNumero = {};
     data.payments.forEach((p, i) => { byNumero[p.nossoNumero] = i; });
 
     let added = 0, updated = 0, skipped = 0;
+    // Track 02 entries that were later elevated to 06 in the SAME file
+    const pendentes02 = new Set(incoming.filter(p => p.ocorrencia.includes('02')).map(p => p.nossoNumero));
+    const liquidados06 = new Set(incoming.filter(p => p.ocorrencia.includes('06')).map(p => p.nossoNumero));
+    // Boletos that appear as 02 AND 06 in the same file = paid in this period
+    const elevadosNoPeriodo = [...pendentes02].filter(nn => liquidados06.has(nn)).length;
 
     for (const p of incoming) {
       const existingIdx = byNumero[p.nossoNumero];
@@ -148,13 +350,34 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       }
     }
 
+    // Count truly pending (02) entries now in the database with no vencimento
+    const semVencimento = data.payments.filter(p => p.ocorrencia.includes('02') && !p.dataVencimento).length;
+
     data.uploads.unshift({
       id: Date.now(), fileName: req.file.originalname,
       uploadedAt: new Date().toISOString(),
       rowsAdded: added, rowsUpdated: updated, rowsSkipped: skipped, totalRows: incoming.length
     });
     await saveData(data);
-    res.json({ success: true, added, updated, skipped, total: data.payments.length });
+    res.json({
+      success: true, added, updated, skipped, total: data.payments.length,
+      pendentes: pendentes02.size, elevadosNoPeriodo, semVencimento
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/upload/preview', upload.single('file'), (req, res) => {
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    const preview = rows.slice(0, 8).map((row, ri) => ({
+      row: ri,
+      cols: row.map((val, ci) => ({ ci, val: String(val ?? '') }))
+    }));
+    res.json({ totalRows: rows.length, preview });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -423,7 +646,7 @@ Forneça: 1) Resumo Executivo (2-3 linhas) 2) Pontos de Atenção (lista com emo
   }
 });
 
-// Companies CRUD
+/* ===== Companies CRUD ===== */
 app.get('/api/companies', async (req, res) => {
   try {
     const data = await loadData();
@@ -476,6 +699,58 @@ app.delete('/api/companies', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/* ===== WhatsApp routes ===== */
+
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json({ status: wppStatus });
+});
+
+app.get('/api/whatsapp/qr', (req, res) => {
+  if (wppStatus !== 'qr' || !wppQr) return res.status(404).json({ error: 'QR não disponível' });
+  res.json({ qr: wppQr });
+});
+
+app.post('/api/whatsapp/connect', (req, res) => {
+  if (wppStatus === 'disconnected') initWhatsApp();
+  res.json({ status: wppStatus });
+});
+
+app.post('/api/whatsapp/disconnect', async (req, res) => {
+  try {
+    if (wppClient) {
+      await wppClient.logout();
+      await wppClient.destroy();
+    }
+  } catch {}
+  wppClient = null;
+  wppStatus = 'disconnected';
+  wppQr = null;
+  res.json({ success: true });
+});
+
+/* ===== Cobranças routes ===== */
+
+app.get('/api/cobrancas/log', async (req, res) => {
+  try {
+    const data = await loadData();
+    res.json({ log: (data.cobrancasLog || []).slice(0, 100) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/cobrancas/enviar', async (req, res) => {
+  const tipo = req.query.tipo;
+  if (!['aviso', 'vencimento', 'atraso'].includes(tipo))
+    return res.status(400).json({ error: 'tipo inválido (aviso | vencimento | atraso)' });
+  if (wppStatus !== 'ready')
+    return res.status(400).json({ error: 'WhatsApp não conectado' });
+  try {
+    const result = await enviarCobrancas(tipo);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/clear', async (req, res) => {
   try {
     await saveData({ payments: [], uploads: [] });
@@ -487,6 +762,18 @@ app.delete('/api/clear', async (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`\n✅ Dashboard rodando em http://localhost:${PORT}\n`));
+
+  // Inicializa WhatsApp
+  initWhatsApp();
+
+  // Cron jobs diários às 08:00
+  try {
+    const cron = require('node-cron');
+    cron.schedule('0 8 * * *', () => enviarCobrancas('aviso'));
+    cron.schedule('0 8 * * *', () => enviarCobrancas('vencimento'));
+    cron.schedule('0 8 * * *', () => enviarCobrancas('atraso'));
+    console.log('Cobranças automáticas agendadas para 08:00');
+  } catch { console.warn('node-cron não instalado — cobranças automáticas desativadas'); }
 }
 
 module.exports = app;
