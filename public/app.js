@@ -965,7 +965,7 @@ function applyWppStatus(status) {
   } else if (status === 'agent_offline') {
     dot.classList.add('wpp-dot-gray');
     label.textContent = 'Agente offline';
-    sub.textContent = 'Execute "npm run wpp" no seu computador para ativar';
+    sub.textContent = 'Dê duplo clique em whatsapp-iniciar.bat no seu computador';
     connectBtn.style.display = 'none';
   } else {
     dot.classList.add('wpp-dot-gray');
