@@ -1,6 +1,7 @@
 import makeWASocket, { DisconnectReason, useMultiFileAuthState, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import express from 'express';
+import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -215,4 +216,13 @@ app.listen(LOCAL_PORT, () => {
   console.log(`║  Abra o dashboard e clique em Conectar  ║`);
   console.log(`╚══════════════════════════════════════════╝\n`);
   initWhatsApp();
+
+  // Cron: envio automático diário às 08:00
+  cron.schedule('0 8 * * *', () => {
+    console.log('[CRON] Iniciando envios automáticos das 08:00...');
+    enviarCobrancas('aviso').then(r => console.log('[CRON] aviso:', r));
+    enviarCobrancas('vencimento').then(r => console.log('[CRON] vencimento:', r));
+    enviarCobrancas('atraso').then(r => console.log('[CRON] atraso:', r));
+  });
+  console.log('[CRON] Cobranças automáticas agendadas para 08:00');
 });

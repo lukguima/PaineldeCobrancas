@@ -75,11 +75,6 @@ function parseDate(str) {
   return new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
 }
 
-function normalizarTelefone(tel) {
-  const digits = tel.replace(/\D/g, '');
-  if (digits.startsWith('55') && digits.length >= 12) return digits;
-  return '55' + digits;
-}
 
 function parseExcel(buffer, fileName) {
   const wb = XLSX.read(buffer, { type: 'buffer' });
@@ -145,180 +140,7 @@ function statusPriority(ocorrencia) {
   return 1;
 }
 
-/* ===== WHATSAPP (Baileys) ===== */
-
-let wppClient = null;
-let wppStatus = 'disconnected'; // 'disconnected' | 'qr' | 'connecting' | 'ready'
-let wppQr = null;
-
-async function initWhatsApp() {
-  try {
-    console.log('[WPP] Carregando Baileys...');
-    const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = await import('@whiskeysockets/baileys');
-    console.log('[WPP] Baileys carregado. Carregando @hapi/boom...');
-    const { Boom } = await import('@hapi/boom');
-    const QRCode = require('qrcode');
-    const pino = require('pino');
-    console.log('[WPP] Dependências OK.');
-
-    if (wppClient) {
-      try { wppClient.end(); } catch {}
-      wppClient = null;
-    }
-
-    wppStatus = 'connecting';
-    wppQr = null;
-
-    const sessionPath = path.join(__dirname, 'data', 'wpp-session');
-    if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
-    console.log('[WPP] Carregando sessão em:', sessionPath);
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-    console.log('[WPP] Sessão carregada. Criando socket...');
-
-    const sock = makeWASocket({
-      auth: state,
-      logger: pino({ level: 'silent' }),
-      printQRInTerminal: false,
-      browser: ['Painel Cobranças', 'Chrome', '1.0.0'],
-    });
-
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-      console.log('[WPP] connection.update:', JSON.stringify({ connection, hasQr: !!qr }));
-
-      if (qr) {
-        wppStatus = 'qr';
-        try { wppQr = await QRCode.toDataURL(qr); } catch {}
-      }
-
-      if (connection === 'close') {
-        const err = lastDisconnect?.error;
-        const code = new Boom(err)?.output?.statusCode;
-        console.log('[WPP] Conexão fechada. Código:', code, '| Motivo:', err?.message || 'desconhecido');
-        if (code !== DisconnectReason.loggedOut) {
-          console.log('[WPP] Tentando reconectar em 5s...');
-          setTimeout(() => initWhatsApp(), 5000);
-        } else {
-          wppStatus = 'disconnected';
-          wppClient = null;
-          wppQr = null;
-        }
-      } else if (connection === 'open') {
-        wppStatus = 'ready';
-        wppQr = null;
-        console.log('WhatsApp conectado (Baileys)');
-      }
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    wppClient = sock;
-    console.log('[WPP] Socket criado. Aguardando eventos de conexão...');
-  } catch (err) {
-    console.error('[WPP] ERRO ao inicializar:', err.message);
-    console.error('[WPP] Stack:', err.stack);
-    wppStatus = 'error';
-    wppQr = null;
-  }
-}
-
-/* ===== TEMPLATES DE COBRANÇA ===== */
-
-const TEMPLATES = {
-  aviso: (nome, valor, vencimento) =>
-    `Olá *${nome}*! 👋\n\nPassando para lembrar que você tem um boleto no valor de *R$ ${valor}* com vencimento *amanhã (${vencimento})*.\n\nEfetue o pagamento para evitar juros e multas.\n\n_Mensagem automática — não responda._`,
-
-  vencimento: (nome, valor, vencimento) =>
-    `Olá *${nome}*! 👋\n\nSeu boleto no valor de *R$ ${valor}* vence *hoje (${vencimento})*.\n\nEfetue o pagamento ainda hoje para evitar multas.\n\n_Mensagem automática — não responda._`,
-
-  atraso: (nome, valor, vencimento, dias) =>
-    `Olá *${nome}*! ⚠️\n\nIdentificamos que seu boleto de *R$ ${valor}* (vencimento: ${vencimento}) está em atraso há *${dias} dia${dias > 1 ? 's' : ''}*.\n\nEntre em contato para regularizar sua situação.\n\n_Mensagem automática — não responda._`
-};
-
-/* ===== ENVIO DE COBRANÇAS ===== */
-
-async function enviarCobrancas(tipo) {
-  if (wppStatus !== 'ready' || !wppClient) return { enviados: 0, erros: 0, pulados: 0 };
-
-  const data = await loadData();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
-
-  const companyMap = {};
-  (data.companies || []).forEach(c => { companyMap[c.cnpj] = c; });
-
-  const pendentes = data.payments.filter(p => p.ocorrencia.includes('02'));
-  if (!data.cobrancasLog) data.cobrancasLog = [];
-
-  const enviados_hoje = new Set(
-    data.cobrancasLog
-      .filter(l => l.data === todayStr)
-      .map(l => `${l.nossoNumero}_${l.tipo}`)
-  );
-
-  let enviados = 0, erros = 0, pulados = 0;
-
-  for (const p of pendentes) {
-    const venc = parseDate(p.dataVencimento);
-    if (!venc) { pulados++; continue; }
-
-    const diffDays = Math.round((venc - today) / (1000 * 60 * 60 * 24));
-
-    const deveEnviar = (
-      (tipo === 'aviso'      && diffDays === 1)  ||
-      (tipo === 'vencimento' && diffDays === 0)  ||
-      (tipo === 'atraso'     && diffDays < 0)
-    );
-
-    if (!deveEnviar) { pulados++; continue; }
-
-    const chave = `${p.nossoNumero}_${tipo}`;
-    if (enviados_hoje.has(chave)) { pulados++; continue; }
-
-    const cnpj = p.pagador.split(' - ')[0]?.trim();
-    const company = companyMap[cnpj];
-    if (!company?.telefone) { pulados++; continue; }
-
-    const telefone = normalizarTelefone(company.telefone);
-    if (telefone.length < 12) { pulados++; continue; }
-
-    const nome = company.nome;
-    const valorFmt = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    const diasAtraso = Math.abs(diffDays);
-
-    let msg;
-    if (tipo === 'aviso')      msg = TEMPLATES.aviso(nome, valorFmt, p.dataVencimento);
-    else if (tipo === 'vencimento') msg = TEMPLATES.vencimento(nome, valorFmt, p.dataVencimento);
-    else                       msg = TEMPLATES.atraso(nome, valorFmt, p.dataVencimento, diasAtraso);
-
-    try {
-      await wppClient.sendMessage(`${telefone}@s.whatsapp.net`, { text: msg });
-      data.cobrancasLog.unshift({
-        nossoNumero: p.nossoNumero,
-        tipo,
-        data: todayStr,
-        telefone,
-        nome,
-        valor: p.valorBoleto,
-        vencimento: p.dataVencimento,
-        sentAt: new Date().toISOString()
-      });
-      enviados_hoje.add(chave);
-      enviados++;
-    } catch {
-      erros++;
-    }
-  }
-
-  if (enviados > 0) {
-    data.cobrancasLog = data.cobrancasLog.slice(0, 500);
-    await saveData(data);
-  }
-
-  return { enviados, erros, pulados };
-}
+/* WhatsApp roda apenas no agente local (whatsapp-local.mjs) */
 
 /* ===== ROTAS ===== */
 
@@ -719,35 +541,6 @@ app.delete('/api/companies', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-/* ===== WhatsApp routes ===== */
-
-app.get('/api/whatsapp/status', (req, res) => {
-  res.json({ status: wppStatus });
-});
-
-app.get('/api/whatsapp/qr', (req, res) => {
-  if (wppStatus !== 'qr' || !wppQr) return res.status(404).json({ error: 'QR não disponível' });
-  res.json({ qr: wppQr });
-});
-
-app.post('/api/whatsapp/connect', (req, res) => {
-  if (wppStatus === 'disconnected' || wppStatus === 'error') initWhatsApp();
-  res.json({ status: wppStatus });
-});
-
-app.post('/api/whatsapp/disconnect', async (req, res) => {
-  try {
-    if (wppClient) {
-      await wppClient.logout();
-      wppClient.end();
-    }
-  } catch {}
-  wppClient = null;
-  wppStatus = 'disconnected';
-  wppQr = null;
-  res.json({ success: true });
-});
-
 /* ===== Cobranças routes ===== */
 
 app.get('/api/cobrancas/log', async (req, res) => {
@@ -755,20 +548,6 @@ app.get('/api/cobrancas/log', async (req, res) => {
     const data = await loadData();
     res.json({ log: (data.cobrancasLog || []).slice(0, 100) });
   } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/cobrancas/enviar', async (req, res) => {
-  const tipo = req.query.tipo;
-  if (!['aviso', 'vencimento', 'atraso'].includes(tipo))
-    return res.status(400).json({ error: 'tipo inválido (aviso | vencimento | atraso)' });
-  if (wppStatus !== 'ready')
-    return res.status(400).json({ error: 'WhatsApp não conectado' });
-  try {
-    const result = await enviarCobrancas(tipo);
-    res.json({ success: true, ...result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 app.delete('/api/clear', async (req, res) => {
@@ -783,17 +562,7 @@ app.delete('/api/clear', async (req, res) => {
 if (require.main === module) {
   app.listen(PORT, () => console.log(`\n✅ Dashboard rodando em http://localhost:${PORT}\n`));
 
-  // Inicializa WhatsApp
-  initWhatsApp();
-
-  // Cron jobs diários às 08:00
-  try {
-    const cron = require('node-cron');
-    cron.schedule('0 8 * * *', () => enviarCobrancas('aviso'));
-    cron.schedule('0 8 * * *', () => enviarCobrancas('vencimento'));
-    cron.schedule('0 8 * * *', () => enviarCobrancas('atraso'));
-    console.log('Cobranças automáticas agendadas para 08:00');
-  } catch { console.warn('node-cron não instalado — cobranças automáticas desativadas'); }
+  console.log('WhatsApp: use o agente local (whatsapp-local.mjs) para envio de cobranças.');
 }
 
 module.exports = app;
