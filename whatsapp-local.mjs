@@ -152,14 +152,17 @@ async function enviarCobrancas(tipo) {
     const tel = normalizarTel(telRaw);
     if (tel.length < 12) { pulados++; skipReasons.telInvalido++; continue; }
 
-    // Verifica se o número tem WhatsApp antes de enviar
+    // Verifica se o número tem WhatsApp e obtém o JID canônico real
+    let jid = `${tel}@s.whatsapp.net`;
     try {
       const [info] = await wppClient.onWhatsApp(`${tel}@s.whatsapp.net`);
       if (!info?.exists) {
         console.log(`[WPP] ${tel} — não tem WhatsApp (pulado)`);
         pulados++; skipReasons.semWhatsapp = (skipReasons.semWhatsapp || 0) + 1; continue;
       }
-    } catch { /* ignora se onWhatsApp falhar, tenta enviar mesmo assim */ }
+      jid = info.jid; // usa o JID real registrado no WhatsApp (pode diferir do número formatado)
+      console.log(`[WPP] JID confirmado: ${jid}`);
+    } catch { /* ignora se onWhatsApp falhar, tenta com JID padrão */ }
 
     const nome  = company?.nome || p.pagador;
     const valor = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -169,8 +172,8 @@ async function enviarCobrancas(tipo) {
                 :                         TEMPLATES.atraso(nome, valor, p.dataVencimento, dias);
 
     try {
-      await wppClient.sendMessage(`${tel}@s.whatsapp.net`, { text: msg });
-      console.log(`[WPP] ✓ Enviado para ${tel} (${nome})`);
+      await wppClient.sendMessage(jid, { text: msg });
+      console.log(`[WPP] ✓ Enviado para ${jid} (${nome})`);
       const entry = { nossoNumero: p.nossoNumero, tipo, data: todayStr, telefone: tel, nome: nome, valor: p.valorBoleto, vencimento: p.dataVencimento, sentAt: new Date().toISOString() };
       sendLog.unshift(entry);
       sendLog = sendLog.slice(0, 200);
