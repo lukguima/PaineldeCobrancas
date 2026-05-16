@@ -298,6 +298,7 @@ async function openEditModal(idEncoded) {
     document.getElementById('editOcorrencia').value = p.ocorrencia;
     document.getElementById('editDataOcorrencia').value = p.dataOcorrencia;
     document.getElementById('editDataVencimento').value = p.dataVencimento;
+    document.getElementById('editTelefone').value = p.telefone || '';
     document.getElementById('editObservacao').value = p.observacao || '';
     document.getElementById('editMetodoPagamento').value = p.metodoPagamento || 'boleto';
     document.getElementById('editModal').classList.add('open');
@@ -317,6 +318,7 @@ async function saveEdit() {
     ocorrencia: document.getElementById('editOcorrencia').value,
     dataOcorrencia: document.getElementById('editDataOcorrencia').value,
     dataVencimento: document.getElementById('editDataVencimento').value,
+    telefone: document.getElementById('editTelefone').value.trim(),
     observacao: document.getElementById('editObservacao').value,
     metodoPagamento: document.getElementById('editMetodoPagamento').value,
   };
@@ -808,6 +810,7 @@ let companiesCache = [];
 async function openCompanyForm(id) {
   const col = document.getElementById('companyFormCol');
   const title = document.getElementById('companyFormTitle');
+  document.querySelector('.companies-layout').classList.add('form-open');
   col.style.display = 'flex';
   col.style.flexDirection = 'column';
   col.style.gap = '16px';
@@ -840,6 +843,7 @@ async function openCompanyForm(id) {
 
 function closeCompanyForm() {
   document.getElementById('companyFormCol').style.display = 'none';
+  document.querySelector('.companies-layout').classList.remove('form-open');
 }
 
 async function saveCompany() {

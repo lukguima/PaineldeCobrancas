@@ -138,16 +138,18 @@ async function enviarCobrancas(tipo) {
 
     const cnpj    = p.pagador.split(' - ')[0]?.trim();
     const company = companyMap[cnpj];
-    if (!company?.telefone) { pulados++; continue; }
+    const telRaw  = p.telefone || company?.telefone;
+    if (!telRaw) { pulados++; continue; }
 
-    const tel = normalizarTel(company.telefone);
+    const tel = normalizarTel(telRaw);
     if (tel.length < 12) { pulados++; continue; }
 
+    const nome  = company?.nome || p.pagador;
     const valor = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     const dias  = Math.abs(diff);
-    const msg   = tipo === 'aviso'      ? TEMPLATES.aviso(company.nome, valor, p.dataVencimento)
-                : tipo === 'vencimento' ? TEMPLATES.vencimento(company.nome, valor, p.dataVencimento)
-                :                         TEMPLATES.atraso(company.nome, valor, p.dataVencimento, dias);
+    const msg   = tipo === 'aviso'      ? TEMPLATES.aviso(nome, valor, p.dataVencimento)
+                : tipo === 'vencimento' ? TEMPLATES.vencimento(nome, valor, p.dataVencimento)
+                :                         TEMPLATES.atraso(nome, valor, p.dataVencimento, dias);
 
     try {
       await wppClient.sendMessage(`${tel}@s.whatsapp.net`, { text: msg });

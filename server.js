@@ -536,6 +536,7 @@ app.put('/api/payments', async (req, res) => {
       dataVencimento: req.body.dataVencimento ?? old.dataVencimento,
       dataOcorrencia: req.body.dataOcorrencia ?? old.dataOcorrencia,
       ocorrencia: req.body.ocorrencia ?? old.ocorrencia,
+      telefone: req.body.telefone !== undefined ? req.body.telefone : (old.telefone || ''),
       observacao: req.body.observacao ?? old.observacao,
       metodoPagamento: req.body.metodoPagamento ?? old.metodoPagamento ?? 'boleto',
     };
