@@ -152,6 +152,15 @@ async function enviarCobrancas(tipo) {
     const tel = normalizarTel(telRaw);
     if (tel.length < 12) { pulados++; skipReasons.telInvalido++; continue; }
 
+    // Verifica se o número tem WhatsApp antes de enviar
+    try {
+      const [info] = await wppClient.onWhatsApp(`${tel}@s.whatsapp.net`);
+      if (!info?.exists) {
+        console.log(`[WPP] ${tel} — não tem WhatsApp (pulado)`);
+        pulados++; skipReasons.semWhatsapp = (skipReasons.semWhatsapp || 0) + 1; continue;
+      }
+    } catch { /* ignora se onWhatsApp falhar, tenta enviar mesmo assim */ }
+
     const nome  = company?.nome || p.pagador;
     const valor = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     const dias  = Math.abs(diff);
@@ -161,6 +170,7 @@ async function enviarCobrancas(tipo) {
 
     try {
       await wppClient.sendMessage(`${tel}@s.whatsapp.net`, { text: msg });
+      console.log(`[WPP] ✓ Enviado para ${tel} (${nome})`);
       const entry = { nossoNumero: p.nossoNumero, tipo, data: todayStr, telefone: tel, nome: nome, valor: p.valorBoleto, vencimento: p.dataVencimento, sentAt: new Date().toISOString() };
       sendLog.unshift(entry);
       sendLog = sendLog.slice(0, 200);
@@ -168,7 +178,7 @@ async function enviarCobrancas(tipo) {
       enviados++;
       await new Promise(r => setTimeout(r, 1500));
     } catch (err) {
-      console.error(`[WPP] Erro ao enviar para ${tel}:`, err.message);
+      console.error(`[WPP] ✗ Erro ao enviar para ${tel}:`, err.message);
       erros++;
     }
   }

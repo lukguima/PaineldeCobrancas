@@ -1012,7 +1012,8 @@ async function wppEnviar(tipo) {
     showToast('Enviando mensagens…', 'info');
     const r = await wppFetch(`/enviar?tipo=${tipo}`, { method: 'POST' });
     let msg = `${r.enviados} enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`;
-    if (r.skipReasons?.semTelefone > 0) msg += ` — ${r.skipReasons.semTelefone} sem telefone cadastrado`;
+    if (r.skipReasons?.semTelefone > 0) msg += ` — ${r.skipReasons.semTelefone} sem telefone`;
+    if (r.skipReasons?.semWhatsapp > 0) msg += ` — ${r.skipReasons.semWhatsapp} sem WhatsApp no número`;
     showToast(msg, r.enviados > 0 ? 'success' : 'info');
     loadWppLog();
   } catch { showToast('Agente local offline. Execute: npm run wpp', 'error'); }
