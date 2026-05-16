@@ -783,16 +783,23 @@ body {
 
 /* ===== COMPANIES MODAL ===== */
 .modal-card-xl { max-width: 900px; }
-.companies-layout { display: grid; grid-template-columns: 1fr 400px; gap: 0; min-height: 420px; border-top: 1px solid var(--border); overflow: hidden; }
+.companies-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 0;
+  min-height: 420px;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+/* Quando o form abre: esconde lista e expande form para largura total */
+.companies-layout.form-open { grid-template-columns: 1fr; }
+.companies-layout.form-open .companies-list-col { display: none; }
 
 @media (max-width: 720px) {
   .modal-card-xl { max-width: 100%; }
   .modal-overlay { padding: 12px; }
-  .companies-layout { grid-template-columns: 1fr; min-height: unset; }
-  .companies-layout.form-open .companies-list-col { display: none; }
-  .companies-layout:not(.form-open) .company-form-col { display: none !important; }
+  .companies-layout { min-height: unset; }
   .companies-list-col { border-right: none; }
-  .company-form-col { border-top: 1px solid var(--border); }
 }
 .companies-list-col {
   border-right: 1px solid var(--border); padding: 20px;

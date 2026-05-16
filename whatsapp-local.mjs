@@ -102,6 +102,8 @@ async function initWhatsApp() {
   }
 }
 
+function normalizarCnpj(s) { return (s || '').replace(/\D/g, ''); }
+
 async function enviarCobrancas(tipo) {
   if (wppStatus !== 'ready' || !wppClient)
     return { enviados: 0, erros: 0, pulados: 0, erro: 'WhatsApp não conectado' };
@@ -113,8 +115,9 @@ async function enviarCobrancas(tipo) {
 
   const payments  = paymentsRes.payments  || [];
   const companies = companiesRes.companies || [];
+  // normaliza CNPJ para evitar diferenças de formatação
   const companyMap = {};
-  companies.forEach(c => { companyMap[c.cnpj] = c; });
+  companies.forEach(c => { companyMap[normalizarCnpj(c.cnpj)] = c; });
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString().split('T')[0];
@@ -122,27 +125,31 @@ async function enviarCobrancas(tipo) {
 
   const pendentes = payments.filter(p => p.ocorrencia.includes('02'));
   let enviados = 0, erros = 0, pulados = 0;
+  const skipReasons = { semData: 0, timing: 0, jaEnviado: 0, semTelefone: 0, telInvalido: 0 };
 
   for (const p of pendentes) {
     const venc = parseDate(p.dataVencimento);
-    if (!venc) { pulados++; continue; }
+    if (!venc) { pulados++; skipReasons.semData++; continue; }
 
     const diff = Math.round((venc - today) / 86400000);
     const deve = (tipo === 'aviso' && diff === 1) ||
                  (tipo === 'vencimento' && diff === 0) ||
                  (tipo === 'atraso' && diff < 0);
-    if (!deve) { pulados++; continue; }
+    if (!deve) { pulados++; skipReasons.timing++; continue; }
 
     const chave = `${p.nossoNumero}_${tipo}`;
-    if (jaEnviados.has(chave)) { pulados++; continue; }
+    if (jaEnviados.has(chave)) { pulados++; skipReasons.jaEnviado++; continue; }
 
-    const cnpj    = p.pagador.split(' - ')[0]?.trim();
-    const company = companyMap[cnpj];
-    const telRaw  = p.telefone || company?.telefone;
-    if (!telRaw) { pulados++; continue; }
+    const cnpjNorm = normalizarCnpj(p.pagador.split(' - ')[0]?.trim());
+    const company  = companyMap[cnpjNorm];
+    const telRaw   = p.telefone || company?.telefone;
+    if (!telRaw) {
+      console.log(`[WPP] Pulado sem telefone: ${p.nossoNumero} | pagador: ${p.pagador}`);
+      pulados++; skipReasons.semTelefone++; continue;
+    }
 
     const tel = normalizarTel(telRaw);
-    if (tel.length < 12) { pulados++; continue; }
+    if (tel.length < 12) { pulados++; skipReasons.telInvalido++; continue; }
 
     const nome  = company?.nome || p.pagador;
     const valor = p.valorBoleto.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -153,18 +160,20 @@ async function enviarCobrancas(tipo) {
 
     try {
       await wppClient.sendMessage(`${tel}@s.whatsapp.net`, { text: msg });
-      const entry = { nossoNumero: p.nossoNumero, tipo, data: todayStr, telefone: tel, nome: company.nome, valor: p.valorBoleto, vencimento: p.dataVencimento, sentAt: new Date().toISOString() };
+      const entry = { nossoNumero: p.nossoNumero, tipo, data: todayStr, telefone: tel, nome: nome, valor: p.valorBoleto, vencimento: p.dataVencimento, sentAt: new Date().toISOString() };
       sendLog.unshift(entry);
       sendLog = sendLog.slice(0, 200);
       jaEnviados.add(chave);
       enviados++;
       await new Promise(r => setTimeout(r, 1500));
     } catch (err) {
+      console.error(`[WPP] Erro ao enviar para ${tel}:`, err.message);
       erros++;
     }
   }
 
-  return { enviados, erros, pulados };
+  console.log(`[WPP] Resultado (${tipo}): enviados=${enviados} erros=${erros} pulados=${pulados}`, skipReasons);
+  return { enviados, erros, pulados, skipReasons };
 }
 
 /* ===== API LOCAL ===== */

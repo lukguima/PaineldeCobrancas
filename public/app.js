@@ -1011,7 +1011,9 @@ async function wppEnviar(tipo) {
   try {
     showToast('Enviando mensagens…', 'info');
     const r = await wppFetch(`/enviar?tipo=${tipo}`, { method: 'POST' });
-    showToast(`${r.enviados} enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`, r.enviados > 0 ? 'success' : 'info');
+    let msg = `${r.enviados} enviada(s), ${r.erros} erro(s), ${r.pulados} pulado(s)`;
+    if (r.skipReasons?.semTelefone > 0) msg += ` — ${r.skipReasons.semTelefone} sem telefone cadastrado`;
+    showToast(msg, r.enviados > 0 ? 'success' : 'info');
     loadWppLog();
   } catch { showToast('Agente local offline. Execute: npm run wpp', 'error'); }
 }
