@@ -3,8 +3,15 @@ title Agente WhatsApp - Painel de Cobrancas
 color 0A
 cd /d "%~dp0"
 
-:: Adiciona caminhos comuns do Node.js ao PATH desta sessao
 set "PATH=%PATH%;C:\Program Files\nodejs;%APPDATA%\npm;%LOCALAPPDATA%\Programs\nodejs"
+
+:: Se as dependencias nao estiverem instaladas, roda o setup primeiro
+if not exist "%~dp0node_modules\@whiskeysockets" (
+    echo [INFO] Dependencias nao encontradas. Executando configuracao...
+    echo.
+    call "%~dp0whatsapp-setup.bat"
+    exit /b
+)
 
 echo.
 echo  =========================================
