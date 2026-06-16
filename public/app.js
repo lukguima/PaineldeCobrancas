@@ -14,7 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPayments();
   loadAlerts();
   scheduleAlertRefresh();
+  checkMongoConfig();
 });
+
+async function checkMongoConfig() {
+  try {
+    const data = await apiFetch('/api/health');
+    if (!data.mongoConfigured) {
+      document.getElementById('mongoBanner').style.display = 'block';
+    }
+  } catch { /* ignora falha no health check */ }
+}
 
 function setHeaderDate() {
   document.getElementById('headerDate').textContent = new Date().toLocaleDateString('pt-BR', {

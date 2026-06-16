@@ -9,27 +9,38 @@ const PORT = process.env.PORT || 4000;
 
 /* ===== STORAGE: MongoDB (produção) ou JSON local (dev) ===== */
 
+let cachedClient = null;
 let cachedDb = null;
 
 async function getDb() {
-  if (cachedDb) return cachedDb;
+  if (cachedDb && cachedClient) {
+    try {
+      await cachedClient.db('admin').command({ ping: 1 });
+      return cachedDb;
+    } catch {
+      cachedClient = null;
+      cachedDb = null;
+    }
+  }
   const { MongoClient } = require('mongodb');
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  cachedDb = client.db('painel_cobrancas');
+  cachedClient = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
+  await cachedClient.connect();
+  cachedDb = cachedClient.db('painel_cobrancas');
   return cachedDb;
 }
+
+const DEFAULT_DATA = () => ({ payments: [], uploads: [], companies: [], cobrancasLog: [] });
 
 async function loadData() {
   if (process.env.MONGODB_URI) {
     const db = await getDb();
     const doc = await db.collection('appdata').findOne({ _id: 'main' });
-    if (doc) { const { _id, ...rest } = doc; return rest; }
-    return { payments: [], uploads: [] };
+    if (doc) { const { _id, ...rest } = doc; return { ...DEFAULT_DATA(), ...rest }; }
+    return DEFAULT_DATA();
   }
   const file = path.join(__dirname, 'data', 'payments.json');
-  if (!fs.existsSync(file)) return { payments: [], uploads: [] };
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!fs.existsSync(file)) return DEFAULT_DATA();
+  return { ...DEFAULT_DATA(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 
 async function saveData(data) {
@@ -541,6 +552,11 @@ app.delete('/api/companies', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/* ===== Health / config ===== */
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, mongoConfigured: !!process.env.MONGODB_URI });
+});
+
 /* ===== Cobranças routes ===== */
 
 app.get('/api/cobrancas/log', async (req, res) => {
@@ -552,7 +568,8 @@ app.get('/api/cobrancas/log', async (req, res) => {
 
 app.delete('/api/clear', async (req, res) => {
   try {
-    await saveData({ payments: [], uploads: [] });
+    const data = await loadData();
+    await saveData({ payments: [], uploads: [], companies: data.companies || [], cobrancasLog: data.cobrancasLog || [] });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
