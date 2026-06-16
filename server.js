@@ -540,6 +540,34 @@ app.put('/api/companies', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/companies/import', async (req, res) => {
+  try {
+    const data = await loadData();
+    if (!data.companies) data.companies = [];
+    const existingCnpjs = new Set(data.companies.map(c => c.cnpj));
+    const seen = {};
+    for (const p of data.payments) {
+      const parts = p.pagador.split(' - ');
+      const cnpj = parts[0]?.trim();
+      const nome = parts.slice(1).join(' - ').trim() || cnpj;
+      if (cnpj && !existingCnpjs.has(cnpj) && !seen[cnpj]) {
+        seen[cnpj] = nome;
+      }
+    }
+    const toAdd = Object.entries(seen);
+    for (const [cnpj, nome] of toAdd) {
+      data.companies.push({
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+        cnpj, nome,
+        telefone: '', email: '', metodoPadrao: 'boleto', observacao: '',
+        criadoEm: new Date().toISOString()
+      });
+    }
+    await saveData(data);
+    res.json({ success: true, added: toAdd.length, total: data.companies.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/companies', async (req, res) => {
   try {
     const id = req.query.id;

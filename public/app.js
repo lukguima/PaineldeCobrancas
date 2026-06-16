@@ -370,17 +370,23 @@ async function confirmDelete() {
 }
 
 /* ===== COMPANY DRAWER ===== */
+let drawerCurrentCnpj = '';
+let drawerCurrentNome = '';
+
 function openDrawer(cnpj, nomeShort, nomeCompleto) {
   const drawer = document.getElementById('companyDrawer');
   const overlay = document.getElementById('companyDrawerOverlay');
   const loading = document.getElementById('drawerLoading');
 
-  // Set header
+  drawerCurrentCnpj = cnpj;
+  drawerCurrentNome = nomeCompleto || nomeShort;
+
   document.getElementById('drawerName').textContent = nomeShort;
   document.getElementById('drawerCnpj').textContent = cnpj;
   document.getElementById('drawerIcon').textContent = (nomeShort[0] || '?').toUpperCase();
+  document.getElementById('drawerSaveBtn').style.display = 'none';
+  document.getElementById('drawerSavedBadge').style.display = 'none';
 
-  // Reset
   document.getElementById('dk-recebido').textContent = '—';
   document.getElementById('dk-baixa').textContent = '—';
   document.getElementById('dk-areceber').textContent = '—';
@@ -393,6 +399,43 @@ function openDrawer(cnpj, nomeShort, nomeCompleto) {
   document.body.style.overflow = 'hidden';
 
   loadCompanyData(cnpj);
+  checkDrawerCompanyRegistered(cnpj);
+}
+
+async function checkDrawerCompanyRegistered(cnpj) {
+  try {
+    const data = await apiFetch('/api/companies');
+    const registered = (data.companies || []).some(c => c.cnpj === cnpj);
+    document.getElementById('drawerSaveBtn').style.display = registered ? 'none' : '';
+    document.getElementById('drawerSavedBadge').style.display = registered ? '' : 'none';
+  } catch { /* ignora */ }
+}
+
+async function saveDrawerCompany() {
+  const btn = document.getElementById('drawerSaveBtn');
+  btn.disabled = true;
+  try {
+    await apiFetch('/api/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cnpj: drawerCurrentCnpj, nome: drawerCurrentNome, metodoPadrao: 'boleto' })
+    });
+    btn.style.display = 'none';
+    document.getElementById('drawerSavedBadge').style.display = '';
+    showToast('Empresa salva no cadastro!', 'success');
+  } catch (err) {
+    btn.disabled = false;
+    showToast(err.message, 'error');
+  }
+}
+
+async function importCompaniesFromPayments() {
+  if (!confirm('Importar todas as empresas dos boletos carregados para o cadastro?\n\nEmpresas já cadastradas não serão duplicadas.')) return;
+  try {
+    const data = await apiFetch('/api/companies/import', { method: 'POST' });
+    showToast(`${data.added} empresa${data.added !== 1 ? 's' : ''} importada${data.added !== 1 ? 's' : ''}! Total: ${data.total}`, 'success');
+    loadCompanies();
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 async function loadCompanyData(cnpj) {
